@@ -28,9 +28,9 @@ option_list <- list(
               help="total number of samples in the experiment (can be greater than the number of available indexes) [mandatory]"),
   
   make_option(c("-C","--chemistry"),
-              type="integer",
+              type="character",
               dest="chemistry",
-              help="Illumina chemistry: either 1 (iSeq 100), 2 (NovaSeq, NextSeq & MiniSeq) or 4 (HiSeq & MiSeq) channel chemistry [mandatory].
+              help="Illumina chemistry: either 1 (iSeq 100), 2 (NovaSeq, NextSeq & MiniSeq), 4 (HiSeq & MiSeq) channel chemistry, or X (XLEAP-SBS) [mandatory].
               With the four-channel chemistry, a red laser detects A/C bases and a green laser detects G/T bases and the indexes are compatible 
               if there is at least one red light and one green light at each position. With the two-channel chemistry, G bases have no color, 
               A bases are orange, C bases are red and T bases are green and indexes are compatible if there is at least one color at each position. 
@@ -147,33 +147,77 @@ selectCompIndexes <- as.logical(opt$selectCompIndexes)
 nbMaxTrials <- as.numeric(opt$nbMaxTrials)
 
 nbLanes <- nbSamples/multiplexingRate
-if (file.exists(inputFile)){
-  index <- readIndexesFile(inputFile)
-  index <- addColors(index, chemistry)
-  nr <- nrow(index)
-} else{
+
+# The function readIndexesFileWithWeights returns a list that either contains only index or both index and index2.
+# If the returned list contains index2, you know the input file had four columns, and you proceed to set nr and nr2 with no need to check inputFile2.
+# If only index is present, the file had only two columns, and you can handle inputFile2 separately.
+if (file.exists(inputFile)) {
+  result <- readIndexesFileWithWeights(inputFile)
+  
+  if (!is.null(result$index2)) {
+    # Case with four columns
+    index <- addColors(result$index, chemistry)
+    index2 <- addColors(result$index2, chemistry)
+    nr <- nrow(index)
+    nr2 <- nrow(index2)
+    
+    # Bypass the inputFile2 case as index2 is already set
+    unicityConstraint <- "none"
+    completeLane <- FALSE
+    selectCompIndexes <- FALSE
+  } else {
+    # Case with two columns
+    index <- addColors(result$index, chemistry)
+    nr <- nrow(index)
+    
+    # Check inputFile2 as normal
+    if (!is.null(inputFile2)) {
+      if (file.exists(inputFile2)) {
+        index2 <- readIndexesFileWithWeights(inputFile2)$index
+        index2 <- addColors(index2, chemistry)
+        nr2 <- nrow(index2)
+      } else {
+        stop("\n", inputFile2, " does not exist.")
+      }
+      unicityConstraint <- "none"
+      completeLane <- FALSE
+      selectCompIndexes <- FALSE
+    } else {
+      nr2 <- 1
+      index2 <- NULL
+    }
+  }
+} else {
   stop("\n", inputFile, " does not exist.")
 }
 
-# dual-indexing
-if (!is.null(inputFile2)){
-  if (file.exists(inputFile2)){
-    index2 <- readIndexesFile(inputFile2)
-    index2 <- addColors(index2, chemistry)
-    nr2 <- nrow(index2)
-  } else{
-    stop("\n", inputFile2, " does not exist.")
-  }
-  unicityConstraint <- "none"
-  completeLane <- FALSE
-  selectCompIndexes <- FALSE
-} else{
-  nr2 <- 1
-  index2 <- NULL
-}
+# if (file.exists(inputFile)){
+#   index <- readIndexesFileWithWeights(inputFile)
+#   index <- addColors(index, chemistry)
+#   nr <- nrow(index)
+# } else{
+#   stop("\n", inputFile, " does not exist.")
+# }
+
+# # dual-indexing
+# if (!is.null(inputFile2)){
+#   if (file.exists(inputFile2)){
+#     index2 <- readIndexesFileWithWeights(inputFile2)
+#     index2 <- addColors(index2, chemistry)
+#     nr2 <- nrow(index2)
+#   } else{
+#     stop("\n", inputFile2, " does not exist.")
+#   }
+#   unicityConstraint <- "none"
+#   completeLane <- FALSE
+#   selectCompIndexes <- FALSE
+# } else{
+#   nr2 <- 1
+#   index2 <- NULL
+# }
 
 # some basic checkings
-if (!I(chemistry %in% c("1", "2", "4"))) stop("\nChemistry must be equal to 1 (iSeq 100), 2 (NovaSeq, NextSeq & MiniSeq) or 4 (HiSeq & MiSeq).")
+if (!I(chemistry %in% c("1", "2", "4", "X"))) stop("\nChemistry must be equal to 1 (iSeq 100), 2 (NovaSeq, NextSeq & MiniSeq), 4 (HiSeq & MiSeq), or X (XLEAP-SBS).")
 if (nbSamples %% 1 != 0 || nbSamples <= 1) stop("\nNumber of samples must be an integer greater than 1.")
 if (nbSamples %% multiplexingRate != 0) stop("\nNumber of samples must be a multiple of the multiplexing rate.")
 if (multiplexingRate > nr*nr2) stop("\nMultiplexing rate can't be higher than the number of input indexes.")
@@ -193,7 +237,8 @@ cat("Number of samples:", nbSamples, "\n")
 cat("Chemistry:", switch(chemistry,
                          "1" = "one-channel (iSeq 100)",
                          "2" = "two-channels (NovaSeq, NextSeq & MiniSeq)", 
-                         "4" = "four-channels (HiSeq & MiSeq)"), "\n")
+                         "4" = "four-channels (HiSeq & MiSeq)",
+                         "X" = "two-channels (XLEAP-SBS)"), "\n")
 cat("Number of pools/lanes:", nbLanes, "\n")
 cat("Constraint:", ifelse(unicityConstraint=="none","none",
                           ifelse(unicityConstraint=="lane", "use each combination of compatible indexes only once", 
@@ -264,9 +309,18 @@ print(solution <- findSolution(indexesList = indexesList,
                                chemistry = chemistry,
                                i7i5pairing = i7i5pairing), row.names=FALSE)
 
+# Calculate the percentage of each character in each position of color1 and color2
+# solution_color_percentages <- calculate_color_percentages(solution)
+solution_color_percentages_with_weights <- calculate_color_percentages_with_weights(solution)
+# print(formatted_color_percentages <- convert_to_formatted_output(solution_color_percentages), row.names=FALSE)
+# print(formatted_output_wide <- convert_to_formatted_output_wide(solution_color_percentages), row.names=FALSE)
+print(colorPercentagesFormattedOutputWide <- convert_to_formatted_output_wide(solution_color_percentages_with_weights), row.names=FALSE)
+
 if (!is.null(outputFile)){
-  write.table(solution, outputFile, col.names=TRUE, row.names=FALSE, sep="\t", quote=FALSE)
-  cat("\nThe proposed sequencing design has been exported into", outputFile)
+  # write_to_file(solution, formatted_color_percentages, outputFile)
+  write_to_file(solution, colorPercentagesFormattedOutputWide, outputFile)
 }
+
+heatmapindex(solution)
 
 cat("\nRun the program again to obtain another solution!\n")

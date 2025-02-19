@@ -19,11 +19,13 @@ shinyServer(function(input, output, session) {
     updateTabsetPanel(session, "mainPanel", selected = "inputIndexes")
     shinyjs::hide("proposedSolution")
     shinyjs::hide("visualization")
+    shinyjs::hide("colorBalancing")
   })
   # hide solution and heatmap when changing one of these parameters
   observeEvent(c(input$nbSamples, input$multiplexingRate, input$chemistry), ignoreInit=TRUE, {
     shinyjs::hide("proposedSolution")
     shinyjs::hide("visualization")
+    shinyjs::hide("colorBalancing")
   })
   # piece of code to fix the input file reset problem (trick: pass it into a reactive value)
   rv <- reactiveValues(inputFile=NULL, inputFile2=NULL, testdata="none")
@@ -43,23 +45,26 @@ shinyServer(function(input, output, session) {
   outputOptions(output, "testdataProvided", suspendWhenHidden=FALSE)
   # automatically go to the proposed solution when pressing "search for a solution" and show solution and heatmap
   observeEvent(input$go, {
-    if (is.null(tryCatch({displaySolution()}, error = function(e) NULL))){
+    if (is.null(tryCatch({displaySolution()$solution}, error = function(e) NULL))){
       shinyjs::show("proposedSolution")
       shinyjs::show("visualization")
+      shinyjs::show("colorBalancing")
     }
     updateTabsetPanel(session, "mainPanel", selected = "proposedSolution")
   })
   
-  # list of input indexes 1
+  # list of input index 1
   inputIndex <- reactive({
+    # print('Input index 1 entered')
     if (testData() %in% c("simple", "dual")){
       file <- ifelse(testData() == "simple", "www/inputIndexesExample.txt", "www/index24-i7.txt")
     } else{
       if (!is.null(fileInput())) file <- fileInput()$datapath else return(NULL)
     }
-    index <- tryCatch({readIndexesFile(file)}, 
+    index <- tryCatch({readIndexesFileWithWeights(file)$index}, 
                       error = function(e) stop("An error occured when loading index 1 file, please check its structure."))
     index <- addColors(index, input$chemistry)
+    # print(paste0('index$color: ', index$color))
     index$score <- scores(index$sequence)
     return(index)
   })
@@ -71,28 +76,48 @@ shinyServer(function(input, output, session) {
     if (is.null(index)){
       "No index file loaded yet, use the left panel to select an input file."
     } else{
-      paste0("The table below shows the ", nrow(index), " indexes 1 (i7) uploaded with the colors corresponding
-             to the chosen Illumina chemistry and the minimum number of mismatches with the other indexes.
-             Note that the smallest number of mismatches between two indexes of this list is ", min(index$score), ".")
+      paste0("The table below shows the ", nrow(index), " indices 1 (i7) uploaded with the colors corresponding
+             to the chosen Illumina chemistry and the minimum number of mismatches with the other indices.
+             Note that the smallest number of mismatches between two indices of this list is ", min(index$score), ".")
     }
   }, error = function(e) NULL)})
   
-  # list of input indexes 2
+  # list of input indices 2
   inputIndex2 <- reactive({
+    # print('Input index 2 entered')
+    inputIndex()
     if (testData() == "simple") return(NULL)
     if (testData() == "dual"){
-      file2 <- "www/index24-i5.txt"
+        file2 <- "www/index24-i5.txt"
     } else{
-      if (!is.null(fileInput2())){
-        if (is.null(inputIndex())) stop("Please load indexes 1 (i7) first.")
-        file2 <- fileInput2()$datapath
-      } else{
-        return(NULL)
-      }
+        if (!is.null(fileInput2())){
+            if (is.null(inputIndex())) stop("Please load index 1 (i7) first.")
+            file2 <- fileInput2()$datapath
+        } else {
+            if (!is.null(inputIndex())){
+                file2 <- fileInput()$datapath
+            } else {
+                return(NULL)
+            }
+        }
     }
-    index2 <- tryCatch({readIndexesFile(file2)}, 
-                       error = function(e) stop("An error occured when loading index 2 file, please check its structure."))
+
+    # index2 <- tryCatch({readIndexesFileWithWeights(file2)$index}, 
+    #                    error = function(e) stop("An error occured when loading index 2 file, please check its structure."))
+    if (testData() == "dual" | !is.null(fileInput2())){
+       index2 <- tryCatch({readIndexesFileWithWeights(file2)$index}, 
+                      error = function(e) stop("An error occured when loading index 2 file, please check its structure."))
+    } else {
+       result <- tryCatch({readIndexesFileWithWeights(file2)}, 
+                        error = function(e) stop("An error occured when loading index 2 file, please check its structure."))
+       if (!is.null(result$index2)) {
+           index2 <- result$index2
+       } else {
+           return(NULL)
+       }
+    }
     index2 <- addColors(index2, input$chemistry)
+    # print(paste0('index2$color: ', index2$color))
     index2$score <- scores(index2$sequence)
     return(index2)
   })
@@ -104,9 +129,9 @@ shinyServer(function(input, output, session) {
     if (is.null(index2)){
       ""
     } else{
-      paste0("The table below shows the ", nrow(index2), " indexes 2 (i5) uploaded with the colors corresponding
-             to the chosen Illumina chemistry and the minimum number of mismatches with the other indexes.
-             Note that the smallest number of mismatches between two indexes of this list is ", min(index2$score), ".")
+      paste0("The table below shows the ", nrow(index2), " index 2 (i5) uploaded with the colors corresponding
+             to the chosen Illumina chemistry and the minimum number of mismatches with the other indices.
+             Note that the smallest number of mismatches between two indices of this list is ", min(index2$score), ".")
     }
   }, error = function(e) NULL)})
   
@@ -115,14 +140,14 @@ shinyServer(function(input, output, session) {
     !is.null(inputIndex()) & !is.null(inputIndex2()) && nrow(inputIndex())==nrow(inputIndex2())
   })
   outputOptions(output, "i7i5sameLength", suspendWhenHidden=FALSE)
-  output$i7i5pairing <- renderUI({checkboxInput("i7i5pairing", "i7 and i5 indexes pairing (Illumina UDIs)", value=FALSE)})
+  output$i7i5pairing <- renderUI({checkboxInput("i7i5pairing", "i7 and i5 indices pairing (Illumina UDIs)", value=FALSE)})
   output$textPairingTable <- renderText({tryCatch({
     index <- inputIndex()
     index2 <- inputIndex2()
     if (is.null(index) | is.null(index2) || !input$i7i5pairing){
       ""
     } else{
-      "The table below shows the pairing between the i7 and i5 input indexes."
+      "The table below shows the pairing between the i7 and i5 input indices"
     }
   }, error = function(e) NULL)})
   output$pairingTable <- renderDataTable({
@@ -137,7 +162,7 @@ shinyServer(function(input, output, session) {
     }
   }, options=list(paging=FALSE, searching=FALSE, info=FALSE))
   
-  # propose both the possible nb samples and multiplexing rates according to the input list of indexes
+  # propose both the possible nb samples and multiplexing rates according to the input list of indices
   output$nbSamples <- renderUI({
     index <- tryCatch({inputIndex()}, error = function(e) NULL)
     if (is.null(index)){
@@ -179,14 +204,19 @@ shinyServer(function(input, output, session) {
       }
       choices <- choices[choices <= nr*nr2]
       selectInput("multiplexingRate", label="Multiplexing rate (i.e. # of samples per pool)", 
-                  choices=choices, selected=ifelse(input$chemistry == "2", choices[length(choices)], choices[2]))
+                  choices=choices, selected=choices[length(choices)])
+      # selectInput("multiplexingRate", label="Multiplexing rate (i.e. # of samples per pool)", 
+      #             choices=choices, selected=ifelse(input$chemistry == "2", choices[length(choices)], choices[2]))
     }
   })
   
-  # generate list(s) of indexes
+  # generate list(s) of indices
   generateList <- reactive({
     index <- inputIndex()
-    return(generateListOfIndexesCombinations(index = index[, -4],
+    # print(paste0('column names: ', names(index)))
+    # print(paste0('index[, -5]: ', index[, -5]))
+    
+    return(generateListOfIndexesCombinations(index = index[, -5],
                                              nbSamplesPerLane = as.numeric(input$multiplexingRate),
                                              completeLane = input$completeLane,
                                              selectCompIndexes = input$selectCompIndexes,
@@ -197,7 +227,7 @@ shinyServer(function(input, output, session) {
     if (is.null(index2)){
       return(NULL)
     } else{
-      return(generateListOfIndexesCombinations(index = index2[, -4],
+      return(generateListOfIndexesCombinations(index = index2[, -5],
                                                nbSamplesPerLane = as.numeric(input$multiplexingRate),
                                                completeLane = input$completeLane,
                                                selectCompIndexes = input$selectCompIndexes,
@@ -218,7 +248,7 @@ shinyServer(function(input, output, session) {
         }
       }
       names(index2) <- paste0(names(index2), "2")
-      index <- cbind(index[, -4], index2[, -4])
+      index <- cbind(index[, -5], index2[, -5])
       return(generateListOfIndexesCombinations(index = index,
                                                nbSamplesPerLane = as.numeric(input$multiplexingRate),
                                                completeLane = input$completeLane,
@@ -229,14 +259,14 @@ shinyServer(function(input, output, session) {
   
   # text describing the solution
   output$textDescribingSolution <- renderText({
-    if (!is.null(tryCatch({displaySolution()}, error = function(e) NULL))){
+    if (!is.null(tryCatch({displaySolution()$solution}, error = function(e) NULL))){
       paste("Below is a solution for", as.numeric(input$nbSamples)/as.numeric(input$multiplexingRate),
             "pool(s) of", input$multiplexingRate, "samples using the parameters specified. The table contains
              one row per sample to be sequenced and several columns: pool/lane labels, index ids, index sequences,
              the corresponding colors according to the chosen Illumina chemistry and a score equal to the minimum
-             number of mismatches with the other indexes of the pool/lane.")
+             number of mismatches with the other indices of the pool/lane.")
     } else{
-       "Please load indexes and then press the \"Search for a solution\" button."
+      "Please load indices and then press the \"Search for a solution\" button."
     }
   })
   
@@ -244,12 +274,14 @@ shinyServer(function(input, output, session) {
   displaySolution <- eventReactive(input$go, {
     shinyjs::hide("proposedSolution")
     shinyjs::hide("visualization")
+    shinyjs::hide("colorBalancing")
+    # print("Start of displaySolution")
     if (is.null(input$multiplexingRate) | (is.null(fileInput()) & is.null(fileInput2()) & testData()=="none")){
       return(NULL)
     } else{
       withProgress({
-        index <- inputIndex()[, -4]
-        index2 <- inputIndex2()[, -4]
+        index <- inputIndex()[, -5]
+        index2 <- inputIndex2()[, -5]
         if (is.null(index2)){
           indexesList <- generateList()
           indexesList2 <- NULL
@@ -273,6 +305,8 @@ shinyServer(function(input, output, session) {
             indexesList2 <- generateList2()
           }
         }
+        # print(paste0("Index: ", index))
+        # print(paste0("Index2: ", index2))
         solution <- findSolution(indexesList = indexesList,
                                  index = index,
                                  indexesList2 = indexesList2,
@@ -285,32 +319,69 @@ shinyServer(function(input, output, session) {
                                  selectCompIndexes = input$selectCompIndexes,
                                  chemistry = input$chemistry,
                                  i7i5pairing = input$i7i5pairing)
+        
+        # Calculate the percentage of each character in each position of color1 and color2
+        solution_color_percentages_with_weights <- calculate_color_percentages_with_weights(solution)
+        colorPercentagesFormattedOutputWide <- convert_to_formatted_output_wide(solution_color_percentages_with_weights)
+        
       }, message="R is looking for a solution...", max=0)
       shinyjs::show("proposedSolution")
       shinyjs::show("visualization")
-      return(solution)
+      shinyjs::show("colorBalancing")
+      # return(solution)
+      # print(paste0("Solution: ", solution))
+      return(list(solution = solution, colorPercentagesFormattedOutputWide = colorPercentagesFormattedOutputWide))
     }
   })
+  
   output$solution <- renderDataTable({
-    tryCatch({displaySolution()}, error = function(e) NULL)
+    tryCatch({displaySolution()$solution}, error = function(e) NULL)
   }, options=list(paging=FALSE, searching=FALSE, info=FALSE))
   
+  # text describing the color balancing
+   output$textDescribingColorBalancing <- renderText({
+    if (!is.null(tryCatch({displaySolution()$colorPercentagesFormattedOutputWide}, error = function(e) NULL))){
+      paste("Below are the color percentages for", as.numeric(input$nbSamples)/as.numeric(input$multiplexingRate),
+            "pool(s) of", input$multiplexingRate, "samples using the parameters specified. The table contains 
+             one row for each position (1 - 8) in each color column (color1 and color2), and shows the respective 
+             percentages for each of the red, green, and blue colors in that position (the '-' shows the percentage 
+             where no color is present).")
+    } else{
+      "Please load indices and then press the \"Search for a solution\" button."
+    }
+  })
+  
+  # Render color balancing data table
+  # output$colorPercentagesFormattedOutputWide <- renderDataTable({
+  #  tryCatch({displaySolution()$colorPercentagesFormattedOutputWide}, error = function(e) NULL)
+  # }, options=list(paging=FALSE, searching=FALSE, info=FALSE))
+  output$colorPercentagesFormattedOutputWide <- renderDataTable({
+     tryCatch({displaySolution()$colorPercentagesFormattedOutputWide}, error = function(e) NULL)
+   }, options = list(
+     paging = FALSE, 
+     searching = FALSE, 
+     info = FALSE,
+     columnDefs = list(
+       list(className = 'dt-right', targets = c(4,5,6,7))  # Right align columns 4-7 (R,G,B,-)
+     )
+  ))
+   
   # text describing the heatmap
   output$textDescribingHeatmap <- renderText({
-    if (!is.null(tryCatch({displaySolution()}, error = function(e) NULL))){
+    if (!is.null(tryCatch({displaySolution()$solution}, error = function(e) NULL))){
       paste0("The plot below allows to vizualize the proposed solution. Samples (in rows) are grouped by pool/lane
              and each nucleotide of each index is displayed with a color according to the chosen Illumina chemistry. 
              One can thus quickly check whether each color is used at each position. Note that sample ids (from 1 to ",
              as.numeric(input$nbSamples), ") are printed on the left while index ids are printed on the right.")
     } else{
-      "Please load indexes and then press the \"Search for a solution\" button."
+      "Please load indices and then press the \"Search for a solution\" button."
     }
   })
   
   # plot of the solution
-  output$heatmapindex <- renderPlot({heatmapindex(displaySolution())}, res=90)
+  output$heatmapindex <- renderPlot({heatmapindex(displaySolution()$solution)}, res=90)
   output$heatmapindex2 <- renderUI({
-    if (!is.null(tryCatch({displaySolution()}, error = function(e) NULL))){
+    if (!is.null(tryCatch({displaySolution()$solution}, error = function(e) NULL))){
       plotOutput("heatmapindex", width=900, height=220+20*as.numeric(input$nbSamples))
     }
   })
@@ -318,10 +389,25 @@ shinyServer(function(input, output, session) {
   # download the solution
   output$downloadData <- downloadHandler(
     filename = "chosenIndexes.txt",
-    content = function(file) write.table(displaySolution(), file, col.names=TRUE, row.names=FALSE, sep="\t", quote=FALSE)
+    content = function(file) write.table(displaySolution()$solution, file, col.names=TRUE, row.names=FALSE, sep="\t", quote=FALSE)
   )
   output$downloadButton <- renderUI({
-    if (!is.null(tryCatch({displaySolution()}, error = function(e) NULL))) downloadButton("downloadData", "Download")
+    if (!is.null(tryCatch({displaySolution()$solution}, error = function(e) NULL))) downloadButton("downloadData", "Download")
+  })
+  
+  # download the color balancing solution
+  output$downloadColorBalanceData <- downloadHandler(
+    filename = "colorbalancepercentages.txt",
+    content = function(file) {
+      df <- displaySolution()$colorPercentagesFormattedOutputWide
+      # Replace "NA" with spaces
+      df[is.na(df) | df == "NA"] <- "  "
+      write.table(df, file, col.names=TRUE, row.names=FALSE, sep="\t", quote=FALSE)
+    }
+    # content = function(file) write.table(displaySolution()$colorPercentagesFormattedOutputWide, file, col.names=TRUE, row.names=FALSE, sep="\t", quote=FALSE)
+  )
+  output$downloadColorBalanceButton <- renderUI({
+    if (!is.null(tryCatch({displaySolution()$colorPercentagesFormattedOutputWide}, error = function(e) NULL))) downloadButton("downloadColorBalanceData", "Download")
   })
   
 })
