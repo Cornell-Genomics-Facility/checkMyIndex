@@ -31,23 +31,23 @@ If both *shiny* and *shinyjs* R packages are already installed, one can use the 
 
 ## Rscript command line
 
-*checkMyIndex* can be executed calling `checkMyIndex.r` with `Rscript`. As `checkMyIndex.r` sources `global.r`, both files must be placed in the same directory. Here are 4 examples using either `inputIndexesExample.txt` or `index24-i7.txt` and `index24-i5.txt`:
+*checkMyIndex* can be executed calling `checkMyIndex.r` with `Rscript`. As `checkMyIndex.r` sources `global.r`, both files must be placed in the same directory. Here are 4 examples using `6060-poolA-testCheckMyIndex.txt`:
 
-* List of 9 indexes for 9 samples distributed on 3 lanes with the two-channel XLEAP-SBS Illumina chemistry:
+* List of 27 indexes for 27 samples distributed on 3 lanes with the two-channel XLEAP-SBS Illumina chemistry:
 
-`Rscript checkMyIndex.r --inputFile7=inputIndexesExample.txt -C X -n 9 -m 3`
+`Rscript checkMyIndex.r --inputFile7=6060-poolA-testCheckMyIndex -C X -n 27 -m 9`
 
-* List of 12 indexes for 12 samples distributed on 4 lanes with the four-channel Illumina chemistry using each lane combination only once:
+* List of 27 indexes for 27 samples distributed on 3 lanes with the four-channel Illumina chemistry using each lane combination only once:
 
-`Rscript checkMyIndex.r --inputFile7=inputIndexesExample.txt -C 4 -n 12 -m 3 -u lane`
+`Rscript checkMyIndex.r --inputFile7=6060-poolA-testCheckMyIndex -C 4 -n 27 -m 9 -u lane`
 
-* List of 12 indexes for 12 samples distributed on 4 lanes with the two-channel Illumina chemistry using each index only once:
+* List of 27 indexes for 27 samples distributed on 3 lanes with the two-channel original SBS Illumina chemistry using each index only once:
 
-`Rscript checkMyIndex.r --inputFile7=inputIndexesExample.txt -C 2 -n 12 -m 3 -u index`
+`Rscript checkMyIndex.r --inputFile7=6060-poolA-testCheckMyIndex -C 2 -n 27 -m 9 -u index`
 
-* List of 24 dual-indexes for 24 samples distributed on 2 lanes with the two-channel Illumina chemistry:
+* List of 27 dual-indexes for 27 samples distributed on 3 lanes with the two-channel original SBS Illumina chemistry:
 
-`Rscript checkMyIndex.r --inputFile7=index24-i7.txt --inputFile5=index24-i5.txt -C 2 -n 24 -m 12`
+`Rscript checkMyIndex.r --inputFile7=6060-poolA-testCheckMyIndex -C 2 -n 27 -m 9`
 
 The help page of the script can be displayed running the following command: 
 
