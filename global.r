@@ -5,6 +5,7 @@ library(tidyr)
 library(stringr)
 
 checkMyIndexVersion <- "1.0.2"
+cornellCheckMyIndexVersion <- "1.2.0"
 
 readIndexesFile <- function(file){
   index <- tryCatch({read.table(file, header=FALSE, sep="\t", stringsAsFactors=FALSE, col.names=c("id","sequence"))},
@@ -490,14 +491,20 @@ heatmapindex <- function(solution){
   
   percentage_threshold <- 25
   
+  lengthSequence1 <- nchar(solution$sequence1[1])
+  lengthSequence2 <- nchar(solution$sequence2[1])
+  # print(paste0('lengthSequence1: ', lengthSequence1))
+  
   # print(paste0('solution: ', solution))
   solution_color_percentages <- calculate_color_percentages_with_weights(solution)
-  # print(paste0('solution_color_percentages: ', solution_color_percentages))
+  # print(paste0('solution_color_percentages: ', colnames(solution_color_percentages)))
   
   if ("id1" %in% names(solution)){
     # dual indexing, need to format the solution data.frame as for single-indexing
     solution <- data.frame(sample=solution$sample, pool=solution$pool,
-                           id=paste(solution$id1, solution$id2, sep="-"),
+                           id=ifelse(solution$id1 == solution$id2, 
+                                     paste(solution$id1, paste("(",round(solution$weight1),")", sep="")),
+                                     paste(solution$id1, solution$id2, sep="-")),
                            sequence=paste(solution$sequence1, solution$sequence2),
                            color=paste(solution$color1, solution$color2),
                            stringsAsFactors = FALSE)
@@ -508,23 +515,23 @@ heatmapindex <- function(solution){
                                     str_replace("pool", ""))))
   
   num_pools <- length(pools)
-  color_percentages.pool <- matrix(" ", nrow = 4 * num_pools, ncol = 17)
-  
-  # Initialize a matrix to track numeric values for each row
-  # numeric_values <- matrix(0, nrow = 4 * length(pools), ncol = 16)  # 16 columns (excluding space column)
-  # row_counter <- 1
+  numberPositions <- lengthSequence1 + lengthSequence2 + 1
+  color_percentages.pool <- matrix(" ", nrow = 4 * num_pools, ncol = numberPositions)
   
   for(p in seq_along(pools)) {
     pool <- pools[p]
     row_indices <- (4*(p-1) + 1):(4*p)
     
-    # Process Color1 (positions 1-8)
-    for(pos in 1:8) {
+    # Process Color1 (positions 1-lengthSequence1)
+    for(pos in 1:lengthSequence1) {
       # Get columns for this position and pool
-      r_col <- grep(paste0("pool", pool, "_pos", pos, ".*_R$"), colnames(solution_color_percentages), value = TRUE)
-      g_col <- grep(paste0("pool", pool, "_pos", pos, ".*_G$"), colnames(solution_color_percentages), value = TRUE)
-      b_col <- grep(paste0("pool", pool, "_pos", pos, ".*_B$"), colnames(solution_color_percentages), value = TRUE)
-      dash_col <- grep(paste0("pool", pool, "_pos", pos, ".*_-$"), colnames(solution_color_percentages), value = TRUE)
+      r_col <- grep(paste0("pool", pool, "_pos", pos, ".*_position",pos,"_R$"), colnames(solution_color_percentages), value = TRUE)
+      g_col <- grep(paste0("pool", pool, "_pos", pos, ".*_position",pos,"_G$"), colnames(solution_color_percentages), value = TRUE)
+      b_col <- grep(paste0("pool", pool, "_pos", pos, ".*_position",pos,"_B$"), colnames(solution_color_percentages), value = TRUE)
+      dash_col <- grep(paste0("pool", pool, "_pos", pos, ".*_position",pos,"_-$"), colnames(solution_color_percentages), value = TRUE)
+      
+      # print(paste0('pos: ', pos))
+      # print(paste0('r_col: ', r_col))
       
       # Fill values for Color1 (first set of columns)
       if(length(r_col) > 0) {
@@ -560,28 +567,28 @@ heatmapindex <- function(solution){
       if(length(r_col) > 1) {
         val <- solution_color_percentages[1, r_col[2]]
         if(!is.na(val) && is.numeric(val)) {
-          color_percentages.pool[row_indices[1], pos + 9] <- paste0(round(val), "%")
+          color_percentages.pool[row_indices[1], pos + lengthSequence1 + 1] <- paste0(round(val), "%")
           # numeric_values[row_indices[1], pos + 8] <- val
         }
       }
       if(length(g_col) > 1) {
         val <- solution_color_percentages[1, g_col[2]]
         if(!is.na(val) && is.numeric(val)) {
-          color_percentages.pool[row_indices[2], pos + 9] <- paste0(round(val), "%")
+          color_percentages.pool[row_indices[2], pos + lengthSequence1 + 1] <- paste0(round(val), "%")
           # numeric_values[row_indices[2], pos + 8] <- val
         }
       }
       if(length(b_col) > 1) {
         val <- solution_color_percentages[1, b_col[2]]
         if(!is.na(val) && is.numeric(val)) {
-          color_percentages.pool[row_indices[3], pos + 9] <- paste0(round(val), "%")
+          color_percentages.pool[row_indices[3], pos + lengthSequence1 + 1] <- paste0(round(val), "%")
           # numeric_values[row_indices[3], pos + 8] <- val
         }
       }
       if(length(dash_col) > 1) {
         val <- solution_color_percentages[1, dash_col[2]]
         if(!is.na(val) && is.numeric(val)) {
-          color_percentages.pool[row_indices[4], pos + 9] <- paste0(round(val), "%")
+          color_percentages.pool[row_indices[4], pos + lengthSequence1 + 1] <- paste0(round(val), "%")
           # numeric_values[row_indices[4], pos + 8] <- val
         }
       }
@@ -594,7 +601,7 @@ heatmapindex <- function(solution){
     row_names <- c(row_names, paste0("Pool", pool, c("_R", "_G", "_B", "_-")))
   }
   rownames(color_percentages.pool) <- row_names
-  colnames(color_percentages.pool) <- paste0("Pos", 1:17)
+  colnames(color_percentages.pool) <- paste0("Pos", 1:numberPositions)
   
   # Find rows that have all zeros
   # non_zero_rows <- which(rowSums(numeric_values) > 0)
@@ -653,6 +660,7 @@ heatmapindex <- function(solution){
       rect(xleft=j-1, ybottom=nrow(seqmat)-(i-1), xright=j, ytop=(nrow(seqmat)-(i)),
            col=switch(seqcol[i,j], "R"="orangered", "G"="darkseagreen4", "-"="white", "O"="orange", "NA"="white", " "="white", "B"="blue", "C"="cyan"),
            border=switch(seqcol[i,j], "R"="orangered", "G"="darkseagreen4", "-"="white", "O"="orange", "NA"="white", " "="white", "B"="blue", "C"="cyan"))
+           # border=switch(seqcol[i,j], "R"="orangered", "orangered"))
       # Extract number from percentage string (if it exists)
       value <- suppressWarnings(as.numeric(gsub("[^0-9.]", "", seqmat[i,j])))
       
@@ -668,143 +676,17 @@ heatmapindex <- function(solution){
       text(x=j-0.5, y=nrow(seqmat)-(i-0.5), labels=seqmat[i,j], col=text_color)
     }
   }
+  
   # extract and print sample ids
   tmp <- unlist(lapply(splitsol, function(sol) c("R", "G", "B", "-", sol$sample, NA)))
   text(x=-0.25, y=(nrow(seqmat):1 - 0.5), labels=tmp[-length(tmp)], pos=2)
   text(x=-1.5, y=nrow(seqmat)/2, labels="Sample", srt=90)
+  
   # extract and print index ids
   tmp <- unlist(lapply(splitsol, function(sol) c(NA, NA, NA, NA, sol$id, NA)))
   text(x=ncol(seqmat)+0.25, y=(nrow(seqmat):1 - 0.5), labels=tmp[-length(tmp)], pos=4)
-}
+  }
 
-heatmapindex_format_only <- function(solution){
-  if ("id1" %in% names(solution)){
-    # dual indexing, need to format the solution data.frame as for single-indexing
-    solution <- data.frame(sample=solution$sample, pool=solution$pool,
-                           id=paste(solution$id1, solution$id2, sep="-"),
-                           sequence=paste(solution$sequence1, solution$sequence2),
-                           color=paste(solution$color1, solution$color2),
-                           stringsAsFactors = FALSE)
-  }
-  
-  color_percentages.pool <- matrix(
-    c(0.1, 0.2, 0.3, 0.4, 0.1, 0.2, 0.3, 0.4, " ", 0.1, 0.2, 0.3, 0.4, 0.1, 0.2, 0.3, 0.4,    # percentages for pool 1
-      0.2, 0.3, 0.4, 0.1, 0.2, 0.3, 0.4, 0.1, " ", 0.2, 0.3, 0.4, 0.1, 0.2, 0.3, 0.4, 0.1),   # percentages for pool 2
-    nrow = 2,                 # number of pools
-    ncol = 17,                 # length of sequences
-    byrow = TRUE             # fill matrix by rows
-  )
-  
-  # Optionally, you can add row and column names
-  rownames(color_percentages.pool) <- c("Pool1", "Pool2")
-  colnames(color_percentages.pool) <- c("Pos1", "Pos2", "Pos3", "Pos4", "Pos5", "Pos6", "Pos7", "Pos8", "Pos9", "Pos10", "Pos11", "Pos12", "Pos13", "Pos14", "Pos15", "Pos16", "Pos17")
-  
-  
-  splitsol <- split(solution, solution$pool)
-  # build a matrix containing the index bases and NAs to separate the pools/lanes
-  seqmat <- lapply(splitsol, function(splitsol.pool) do.call("rbind", strsplit(splitsol.pool$sequence, "")))
-  # seqmat <- do.call("rbind", lapply(seqmat, function(seqmat.pool) rbind(seqmat.pool, rep(NA, ncol(seqmat.pool)))))
-  seqmat <- do.call("rbind", lapply(1:length(seqmat), function(i) {
-    rbind(
-      color_percentages.pool[i,],  # Add corresponding row of percentages
-      color_percentages.pool[i,],  # Add corresponding row of percentages
-      color_percentages.pool[i,],  # Add corresponding row of percentages
-      color_percentages.pool[i,],  # Add corresponding row of percentages
-      seqmat[[i]],  # Original sequence matrix for this pool
-      rep(NA, ncol(seqmat[[i]]))  # Separator row
-    )
-  }))
-  seqmat <- seqmat[-nrow(seqmat),]
-  # build a matrix containing the colors and NAs to separate the pools/lanes
-  seqcol <- lapply(splitsol, function(splitsol.pool) do.call("rbind", strsplit(splitsol.pool$color, "")))
-  # seqcol <- do.call("rbind", lapply(seqcol, function(seqcol.pool) rbind(seqcol.pool, rep(NA, ncol(seqcol.pool)))))
-  seqcol <- do.call("rbind", lapply(1:length(seqcol), function(i) {
-    rbind(
-      rep(NA, ncol(seqcol[[i]])),  # Add row for percentages
-      rep(NA, ncol(seqcol[[i]])),  # Add row for percentages
-      rep(NA, ncol(seqcol[[i]])),  # Add row for percentages
-      rep(NA, ncol(seqcol[[i]])),  # Add row for percentages
-      seqcol[[i]],  # Original sequence matrix for this pool
-      rep(NA, ncol(seqcol[[i]]))  # Separator row
-    )
-  }))
-  seqcol <- seqcol[-nrow(seqcol),]
-  # plot
-  par(mar=c(2, 6, 1, 6) + 0.1, xpd=TRUE, xaxs="i", yaxs="i")
-  plot.new()
-  plot.window(xlim=c(-1.5, ncol(seqmat)+1.5), ylim=c(-2, nrow(seqmat)))
-  
-  for (i in 1:nrow(seqmat)){
-    for (j in 1:ncol(seqmat)){
-      rect(xleft=j-1, ybottom=nrow(seqmat)-(i-1), xright=j, ytop=nrow(seqmat)-i,
-           col=switch(seqcol[i,j], "R"="orangered", "G"="darkseagreen4", "-"="white", "O"="orange", "NA"="white", " "="white", "B"="blue", "C"="cyan"),
-           border=switch(seqcol[i,j], "R"="orangered", "G"="darkseagreen4", "-"="white", "O"="orange", "NA"="white", " "="white", "B"="blue", "C"="cyan"))
-      text(x=j-0.5, y=nrow(seqmat)-(i-0.5), labels=seqmat[i,j])
-    }
-  }
-  # extract and print sample ids
-  tmp <- unlist(lapply(splitsol, function(sol) c("R", "G", "B", "-", sol$sample, NA)))
-  text(x=-0.25, y=nrow(seqmat):1 - 0.5, labels=tmp[-length(tmp)], pos=2)
-  text(x=-1.5, y=nrow(seqmat)/2, labels="Sample", srt=90)
-  # extract and print index ids
-  tmp <- unlist(lapply(splitsol, function(sol) c(NA, NA, NA, NA, sol$id, NA)))
-  text(x=ncol(seqmat)+0.25, y=nrow(seqmat):1 - 0.5, labels=tmp[-length(tmp)], pos=4)
-}
-
-heatmapindex_old <- function(solution){
-  if ("id1" %in% names(solution)){
-    # dual indexing, need to format the solution data.frame as for single-indexing
-    solution <- data.frame(sample=solution$sample, pool=solution$pool,
-                           id=paste(solution$id1, solution$id2, sep="-"),
-                           sequence=paste(solution$sequence1, solution$sequence2),
-                           color=paste(solution$color1, solution$color2),
-                           stringsAsFactors = FALSE)
-  }
-  splitsol <- split(solution, solution$pool)
-  # build a matrix containing the index bases and NAs to separate the pools/lanes
-  seqmat <- lapply(splitsol, function(splitsol.pool) do.call("rbind", strsplit(splitsol.pool$sequence, "")))
-  seqmat <- do.call("rbind", lapply(seqmat, function(seqmat.pool) rbind(seqmat.pool, rep(NA, ncol(seqmat.pool)))))
-  seqmat <- seqmat[-nrow(seqmat),]
-  # build a matrix containing the colors and NAs to separate the pools/lanes
-  seqcol <- lapply(splitsol, function(splitsol.pool) do.call("rbind", strsplit(splitsol.pool$color, "")))
-  seqcol <- do.call("rbind", lapply(seqcol, function(seqcol.pool) rbind(seqcol.pool, rep(NA, ncol(seqcol.pool)))))
-  seqcol <- seqcol[-nrow(seqcol),]
-  # plot
-  par(mar=c(2, 6, 1, 6) + 0.1, xpd=TRUE, xaxs="i", yaxs="i")
-  plot.new()
-  plot.window(xlim=c(-1.5, ncol(seqmat)+1.5), ylim=c(-2, nrow(seqmat)))
-  
-  for (i in 1:nrow(seqmat)){
-    for (j in 1:ncol(seqmat)){
-      rect(xleft=j-1, ybottom=nrow(seqmat)-(i-1), xright=j, ytop=nrow(seqmat)-i,
-           col=switch(seqcol[i,j], "R"="orangered", "G"="darkseagreen4", "-"="white", "O"="orange", "NA"="white", " "="white", "B"="blue", "C"="cyan"),
-           border=switch(seqcol[i,j], "R"="orangered", "G"="darkseagreen4", "-"="white", "O"="orange", "NA"="white", " "="white", "B"="blue", "C"="cyan"))
-      
-      # Extract number from percentage string (if it exists)
-      value <- suppressWarnings(as.numeric(gsub("[^0-9.]", "", seqmat[i,j])))
-
-      # Determine text color based on value
-      text_color <- "green"  # default color
-      if (!is.na(value)) {  # check if it's actually a number
-        if (value == 0) {
-          text_color <- "lightgray"
-        } else if (value < 40) {  # adjust threshold as needed
-          text_color <- "red"
-        }
-      }
-      print(paste("Value:", value))
-      print(paste("Text color:", text_color))
-      text(x=j-0.5, y=nrow(seqmat)-(i-0.5), labels=seqmat[i,j], col=text_color)
-    }
-  }
-  # extract and print sample ids
-  tmp <- unlist(lapply(splitsol, function(sol) c(sol$sample, NA)))
-  text(x=-0.25, y=nrow(seqmat):1 - 0.5, labels=tmp[-length(tmp)], pos=2)
-  text(x=-1.5, y=nrow(seqmat)/2, labels="Sample", srt=90)
-  # extract and print index ids
-  tmp <- unlist(lapply(splitsol, function(sol) c(sol$id, NA)))
-  text(x=ncol(seqmat)+0.25, y=nrow(seqmat):1 - 0.5, labels=tmp[-length(tmp)], pos=4)
-}
 
 # Function to calculate the percentage of each character in each position of color1 and color2
 calculate_color_percentages <- function(solution) {

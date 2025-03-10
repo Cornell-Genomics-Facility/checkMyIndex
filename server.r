@@ -372,7 +372,7 @@ shinyServer(function(input, output, session) {
       paste0("The plot below allows to vizualize the proposed solution. Samples (in rows) are grouped by pool/lane
              and each nucleotide of each index is displayed with a color according to the chosen Illumina chemistry. 
              One can thus quickly check whether each color is used at each position. Note that sample ids (from 1 to ",
-             as.numeric(input$nbSamples), ") are printed on the left while index ids are printed on the right.")
+             as.numeric(input$nbSamples), ") are printed on the left while index ids and sample weights are printed on the right, followed by sample weights in parentheses.")
     } else{
       "Please load indices and then press the \"Search for a solution\" button."
     }

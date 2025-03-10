@@ -149,8 +149,10 @@ shinyUI(fluidPage(theme = "bootstrap.min.css", shinyjs::useShinyjs(),
 
                                  p("Please note that checkMyIndex is provided without any guarantees as to its accuracy."),
                                  
+                                 
                                  h3("Version"),
-                                 p(paste0("This website executes checkMyIndex version ", checkMyIndexVersion, ". with modifications to include XLEAP-SBS chemistry.")),
+                                 p(paste0("Software based on the Institut Pasteur checkMyIndex version ", checkMyIndexVersion, ".")),
+                                 p(paste0("Genomics Facility at Cornell checkMyIndex version ", cornellCheckMyIndexVersion, ", with modifications to include XLEAP-SBS chemistry.")),
                                  div(img(src="logo_c3bi_citech.jpg", width=300), style="text-align: center;"))
                         
                       )
