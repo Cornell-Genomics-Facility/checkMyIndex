@@ -323,6 +323,9 @@ shinyServer(function(input, output, session) {
         # Calculate the percentage of each character in each position of color1 and color2
         solution_color_percentages_with_weights <- calculate_color_percentages_with_weights(solution)
         colorPercentagesFormattedOutputWide <- convert_to_formatted_output_wide(solution_color_percentages_with_weights)
+        areIndicesCompatible = all(solution$areIndicesCompatible)
+        # print(paste0("solution: ", solution))
+        # print(paste0("areIndicesCompatible: ", areIndicesCompatible))
         
       }, message="R is looking for a solution...", max=0)
       shinyjs::show("proposedSolution")
@@ -330,7 +333,9 @@ shinyServer(function(input, output, session) {
       shinyjs::show("colorBalancing")
       # return(solution)
       # print(paste0("Solution: ", solution))
-      return(list(solution = solution, colorPercentagesFormattedOutputWide = colorPercentagesFormattedOutputWide))
+      return(list(solution = solution, 
+                  colorPercentagesFormattedOutputWide = colorPercentagesFormattedOutputWide,
+                  areIndicesCompatible = areIndicesCompatible))
     }
   })
   
@@ -372,10 +377,32 @@ shinyServer(function(input, output, session) {
       paste0("The plot below allows to vizualize the proposed solution. Samples (in rows) are grouped by pool/lane
              and each nucleotide of each index is displayed with a color according to the chosen Illumina chemistry. 
              One can thus quickly check whether each color is used at each position. Note that sample ids (from 1 to ",
-             as.numeric(input$nbSamples), ") are printed on the left while index ids and sample weights are printed on the right, followed by sample weights in parentheses.")
+             as.numeric(input$nbSamples), ") are printed on the left while index ids and sample weights are printed ",
+             "on the right, followed by sample weights in parentheses.")
     } else{
       "Please load indices and then press the \"Search for a solution\" button."
     }
+  })
+  
+  output$compatibilityWarning <- renderText({
+    if (!is.null(tryCatch({displaySolution()$areIndicesCompatible}, error = function(e) NULL)) && !displaySolution()$areIndicesCompatible){
+      return("****  Warning: Colors in indices are not compatible in at least one pool/lane  ****")
+    }
+    return("")
+  })
+  
+  output$compatibilityWarning2 <- renderText({
+    if (!is.null(tryCatch({displaySolution()$areIndicesCompatible}, error = function(e) NULL)) && !displaySolution()$areIndicesCompatible){
+      return("****  Warning: Colors in indices are not compatible in at least one pool/lane  ****")
+    }
+    return("")
+  })
+  
+  output$compatibilityWarning3 <- renderText({
+    if (!is.null(tryCatch({displaySolution()$areIndicesCompatible}, error = function(e) NULL)) && !displaySolution()$areIndicesCompatible){
+      return("****  Warning: Colors in indices are not compatible in at least one pool/lane  ****")
+    }
+    return("")
   })
   
   # plot of the solution

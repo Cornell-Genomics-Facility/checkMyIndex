@@ -3,6 +3,20 @@ library(shinyjs)
 
 shinyUI(fluidPage(theme = "bootstrap.min.css", shinyjs::useShinyjs(),
 
+                  # Add the CSS styling
+                  tags$head(
+                    tags$style(
+                      "#compatibilityWarning,
+                       #compatibilityWarning2,
+                       #compatibilityWarning3 {
+                          color: red;
+                          text-align: center;
+                          font-weight: bold;
+                          margin-top: 20px;  /* This adds space above the warning */
+                      }"
+                    )
+                  ),
+                  
                   titlePanel(title=div(img(src="dna.png", width=50), strong("Search for a set of compatible indices for your sequencing experiment")), windowTitle="checkMyIndex"),
                   
                   sidebarLayout(
@@ -66,7 +80,8 @@ shinyUI(fluidPage(theme = "bootstrap.min.css", shinyjs::useShinyjs(),
                                  value="proposedSolution",
                                  shinyjs::hidden(div(
                                    id="proposedSolution",
-                                   p(textOutput("textDescribingSolution")),
+                                   p(textOutput("textDescribingSolution"),
+                                     textOutput("compatibilityWarning")),
                                    dataTableOutput("solution"),
                                    br(""),
                                    uiOutput("downloadButton")
@@ -78,7 +93,8 @@ shinyUI(fluidPage(theme = "bootstrap.min.css", shinyjs::useShinyjs(),
                                  value="colorBalancing",
                                  shinyjs::hidden(div(
                                    id="colorBalancing",
-                                   p(textOutput("textDescribingColorBalancing")),
+                                   p(textOutput("textDescribingColorBalancing"),
+                                     textOutput("compatibilityWarning2")),
                                    dataTableOutput("colorPercentagesFormattedOutputWide"),
                                    br(""),
                                    uiOutput("downloadColorBalanceButton")
@@ -89,7 +105,8 @@ shinyUI(fluidPage(theme = "bootstrap.min.css", shinyjs::useShinyjs(),
                         tabPanel("Visualization of the design",
                                  shinyjs::hidden(div(
                                    id="visualization",
-                                   p(textOutput("textDescribingHeatmap")),
+                                   p(textOutput("textDescribingHeatmap"),
+                                     textOutput("compatibilityWarning3")),
                                    uiOutput("heatmapindex2")
                                  ))
                                  ),
