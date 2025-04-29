@@ -323,7 +323,9 @@ shinyServer(function(input, output, session) {
         # Calculate the percentage of each character in each position of color1 and color2
         solution_color_percentages_with_weights <- calculate_color_percentages_with_weights(solution)
         colorPercentagesFormattedOutputWide <- convert_to_formatted_output_wide(solution_color_percentages_with_weights)
+        # areIndicesCompatible <- !sapply(split(solution, solution$pool), areIndexesCompatible, input$chemistry)
         areIndicesCompatible = all(solution$areIndicesCompatible)
+        # print(paste0("split(solution, solution$pool): ", split(solution, solution$pool)))
         # print(paste0("solution: ", solution))
         # print(paste0("areIndicesCompatible: ", areIndicesCompatible))
         

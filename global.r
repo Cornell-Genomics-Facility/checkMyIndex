@@ -134,12 +134,29 @@ areIndexesCompatible <- function(index, chemistry, column="color"){
     # print(paste0('all(sumRed >= 1 & sumGreen >= 1):', (all(sumRed >= 1 & sumGreen >= 1))))
     return(all(sumRed >= 1 & sumGreen >= 1))
   }
-  # if (chemistry == "X"){
-  #   sumBlue <- apply(matColors, 2, function(x) sum(x=="B"))
-  #   sumGreen <- nrow(matColors) - sumBlue
-  #   return(all(sumBlue >= 1 & sumGreen >= 1))
-  # }
-  if (chemistry %in% c("1","2","X")){
+  
+  if (chemistry == "X"){
+    # Count colors for each position
+    sumBlue <- apply(matColors, 2, function(x) sum(x=="B" | x=="C"))  # Count both B and C as blue
+    sumGreen <- apply(matColors, 2, function(x) sum(x=="G" | x=="C")) # Count both G and C as green
+    sumNoColor <- apply(matColors, 2, function(x) sum(x=="-"))
+    
+    # For each position, check if:
+    # - there's at least one green OR
+    # - there's a mixture of blue and no color
+    # AND ensure it's not all blue
+    # positionCheck <- mapply(function(b, g, nc) {
+    #  (g >= 1) || (b >= 1 && nc >= 1)
+    # }, sumBlue, sumGreen, sumNoColor)
+    
+    # Return true only if all positions pass and at least one position has green
+    # return(all(positionCheck) && any(sumGreen >= 1))
+    
+    # Check if each position has at least one green
+    return(all(sumGreen >= 1))
+  }
+
+  if (chemistry %in% c("1","2")){
     sumNoColor <- apply(matColors, 2, function(x) sum(x=="-"))
     return(all(sumNoColor < nrow(index)))
   }
@@ -191,7 +208,11 @@ searchOneSolution <- function(indexesList, index, indexesList2=NULL, index2=NULL
         i <- sample(1:length(indexesList), 1, FALSE)
         if (!i7i5pairing){
           # if (areIndexesCompatible(indexesList[[i]], chemistry, "color")){
-          areIndicesCompatible <- areIndexesCompatible(indexesList[[i]], chemistry, "color")
+          # areIndicesCompatible <- areIndexesCompatible(indexesList[[i]], chemistry, "color")
+          # print(paste0('areIndicesCompatible before: ', areIndexesCompatible(indexesList[[i]], chemistry, "color")))
+          if (is.null(areIndicesCompatible) || areIndicesCompatible) {
+            areIndicesCompatible <- areIndexesCompatible(indexesList[[i]], chemistry, "color")
+          }
           print(paste0('areIndicesCompatible: ', areIndicesCompatible))
           compatibleCombinations[[k]] <- indexesList[[i]]
           # remove either the combination used or all the combinations for which an index has already been selected
@@ -203,7 +224,11 @@ searchOneSolution <- function(indexesList, index, indexesList2=NULL, index2=NULL
           # }
         } else{
           # if (areIndexesCompatible(indexesList[[i]], chemistry, "color") & areIndexesCompatible(indexesList[[i]], chemistry, "color2")){
-          areIndicesCompatible <- (areIndexesCompatible(indexesList[[i]], chemistry, "color") & areIndexesCompatible(indexesList[[i]], chemistry, "color2"))
+          # areIndicesCompatible <- (areIndexesCompatible(indexesList[[i]], chemistry, "color") & areIndexesCompatible(indexesList[[i]], chemistry, "color2"))
+          # print(paste0('areIndicesCompatible before: ', (areIndexesCompatible(indexesList[[i]], chemistry, "color") & areIndexesCompatible(indexesList[[i]], chemistry, "color2"))))
+          if (is.null(areIndicesCompatible) || areIndicesCompatible) {
+            areIndicesCompatible <- (areIndexesCompatible(indexesList[[i]], chemistry, "color") & areIndexesCompatible(indexesList[[i]], chemistry, "color2"))
+          }
           print(paste0('areIndicesCompatible: ', areIndicesCompatible))
           compatibleCombinations[[k]] <- indexesList[[i]]
           k <- k+1
@@ -246,6 +271,18 @@ searchOneSolution <- function(indexesList, index, indexesList2=NULL, index2=NULL
     }
     
     solution$areIndicesCompatible <- areIndicesCompatible
+    
+    # if (is.null(solution$areIndicesCompatible) || all(solution$areIndicesCompatible)) {
+    #   solution$areIndicesCompatible <- ave(rep(TRUE, nrow(solution)), solution$pool, 
+    #                                        FUN=function(x) areIndicesCompatible)
+    # }
+    
+    # solution$areIndicesCompatible <- unlist(tapply(solution$sequence1, solution$pool, 
+    #                                                function(x) areIndicesCompatible))
+    
+    # if (is.null(solution$areIndicesCompatible) || solution$areIndicesCompatible) {
+    #   solution$areIndicesCompatible <- areIndicesCompatible
+    # }
     return(solution)
     # dual-indexing without pairing
   } else {
@@ -268,7 +305,10 @@ searchOneSolution <- function(indexesList, index, indexesList2=NULL, index2=NULL
         i <- sample(1:length(indexesList), 1, FALSE)
         # print(paste0("i: ", i))
         # if (areIndexesCompatible(indexesList[[i]], chemistry)){
-        areIndexesCompatible <- ((areIndexesCompatible(indexesList[[i]], chemistry)) & (areIndexesCompatible(indexesList2[[i2]], chemistry)))
+        # areIndexesCompatible <- ((areIndexesCompatible(indexesList[[i]], chemistry)) & (areIndexesCompatible(indexesList2[[i2]], chemistry)))
+        if (is.null(areIndicesCompatible) || areIndicesCompatible) {
+          areIndexesCompatible <- ((areIndexesCompatible(indexesList[[i]], chemistry)) & (areIndexesCompatible(indexesList2[[i2]], chemistry)))
+        }
         compatibleCombinations[[k]] <- indexesList[[i]]
         i2 <- ifelse(i7i5pairing, i, sample(1:length(indexesList2), 1, FALSE))
         # if (areIndexesCompatible(indexesList2[[i2]], chemistry)){
@@ -367,6 +407,7 @@ searchOneSolution <- function(indexesList, index, indexesList2=NULL, index2=NULL
                            stringsAsFactors = FALSE)
     
     solution$areIndicesCompatible <- areIndicesCompatible
+
     return(solution)
   }
 }
@@ -617,14 +658,23 @@ findSolution <- function(indexesList, index, indexesList2=NULL, index2=NULL,
                                   unicityConstraint = unicityConstraint,
                                   chemistry = chemistry,
                                   i7i5pairing = i7i5pairing)
+    # print(paste0("nbTrials: ", nbTrials))
     if (!is.null(solution)){
       # check solution only for single-indexing as dual-indexing has no constraint
       if (is.null(indexesList2) & is.null(index2) & !i7i5pairing){
-        checkProposedSolution(solution = solution, unicityConstraint = unicityConstraint, chemistry = chemistry)
+        if (checkProposedSolution(solution = solution, unicityConstraint = unicityConstraint, chemistry = chemistry) | nbTrials == nbMaxTrials) {
+          return(solution)
+        } else {
+          nbTrials <- nbTrials + 1
+        }
       } else{
-        checkProposedSolution2(solution = solution, chemistry = chemistry)
+        if (checkProposedSolution2(solution = solution, chemistry = chemistry) | nbTrials == nbMaxTrials) {
+          return(solution)
+        } else {
+          nbTrials <- nbTrials + 1
+        }
       }
-      return(solution)
+      # return(solution)
     } else{
       nbTrials <- nbTrials + 1
     }
@@ -652,9 +702,10 @@ checkProposedSolution <- function(solution, unicityConstraint, chemistry){
     stop("The solution proposed uses different numbers of samples per lane. Thanks to report this error to Hugo Varet (hugo.varet@pasteur.fr)")
   }
   # indices not compatible in at least one pool/lane
-  # if (any(!sapply(split(solution, solution$pool), areIndexesCompatible, chemistry))){
-  #   stop("The solution proposed uses incompatible indices Thanks to report this error to Hugo Varet (hugo.varet@pasteur.fr)")
-  # }
+  if (any(!sapply(split(solution, solution$pool), areIndexesCompatible, chemistry))){
+    # stop("The solution proposed uses incompatible indices Thanks to report this error to Hugo Varet (hugo.varet@pasteur.fr)")
+    return(FALSE)
+  }
   # two-channel chemistry and indices starting with GG
   if (chemistry == "2" && any(sapply(solution$sequence, substr, 1, 2) == "GG")){
     stop("Indices starting with GG are not compatible with the chosen chemistry. Thanks to report this error to Hugo Varet (hugo.varet@pasteur.fr)")
@@ -663,6 +714,7 @@ checkProposedSolution <- function(solution, unicityConstraint, chemistry){
   if (chemistry == "1" && any(sapply(lapply(split(solution$sequence, solution$pool), substr, 1, 2), function(x) all(x=="GG")))){
     stop("Having all the indices of a pool starting with GG is not compatible with the chosen chemistry. Thanks to report this error to Hugo Varet (hugo.varet@pasteur.fr)")
   }
+  return(TRUE)
 }
 
 # dual-indexing solution checking
@@ -677,13 +729,15 @@ checkProposedSolution2 <- function(solution, chemistry){
   }
   # indices not compatible in at least one pool/lane
   sol1 <- data.frame(id=solution$id1, sequence=solution$sequence1, color=solution$color1, stringsAsFactors = FALSE)
-  # if (any(!sapply(split(sol1, solution$pool), areIndexesCompatible, chemistry))){
-  #   stop("The solution proposed uses incompatible indices. Thanks to report this error to Hugo Varet (hugo.varet@pasteur.fr)")
-  # }
+  if (any(!sapply(split(sol1, solution$pool), areIndexesCompatible, chemistry))){
+    # stop("The solution proposed uses incompatible indices. Thanks to report this error to Hugo Varet (hugo.varet@pasteur.fr)")
+    return(FALSE)
+  }
   sol2 <- data.frame(id=solution$id2, sequence=solution$sequence2, color=solution$color2, stringsAsFactors = FALSE)
-  # if (any(!sapply(split(sol2, solution$pool), areIndexesCompatible, chemistry))){
-  #   stop("The solution proposed uses incompatible indices. Thanks to report this error to Hugo Varet (hugo.varet@pasteur.fr)")
-  # }
+  if (any(!sapply(split(sol2, solution$pool), areIndexesCompatible, chemistry))){
+    # stop("The solution proposed uses incompatible indices. Thanks to report this error to Hugo Varet (hugo.varet@pasteur.fr)")
+    return(FALSE)
+  }
   # two-channel chemistry and indices starting with GG
   if (chemistry == "2" && any(sapply(solution$sequence1, substr, 1, 2) == "GG")){
     stop("Indices starting with GG are not compatible with the chosen chemistry. Thanks to report this error to Hugo Varet (hugo.varet@pasteur.fr)")
@@ -698,6 +752,7 @@ checkProposedSolution2 <- function(solution, chemistry){
   if (chemistry == "1" && any(sapply(lapply(split(solution$sequence2, solution$pool), substr, 1, 2), function(x) all(x=="GG")))){
     stop("Having all the indices of a pool starting with GG is not compatible with the chosen chemistry. Thanks to report this error to Hugo Varet (hugo.varet@pasteur.fr)")
   }
+  return(TRUE)
 }
 
 heatmapindex <- function(solution){
@@ -869,6 +924,11 @@ heatmapindex <- function(solution){
   plot.window(xlim=c(-1.5, ncol(seqmat)+1.5), ylim=c(-2, nrow(seqmat)))
   
   for (i in 1:nrow(seqmat)){
+    # Check if entire row contains only zeros
+    row_values <- suppressWarnings(as.numeric(gsub("[^0-9.]", "", seqmat[i,])))
+    # print(paste0('row_values: ', row_values))
+    is_all_zeros <- all(row_values[!is.na(row_values)] == 0)
+    
     for (j in 1:ncol(seqmat)){
       rect(xleft=j-1, ybottom=nrow(seqmat)-(i-1), xright=j, ytop=(nrow(seqmat)-(i)),
            col=switch(seqcol[i,j], "R"="orangered", "G"="darkseagreen4", "-"="white", "O"="orange", "NA"="white", " "="white", "B"="blue", "C"="cyan"),
@@ -880,7 +940,7 @@ heatmapindex <- function(solution){
       # Determine text color based on value
       text_color <- "black"  # default color
       if (!is.na(value)) {  # check if it's actually a number
-        if (value == 0) {
+        if (value == 0 && is_all_zeros) {
           text_color <- "lightgray"
         } else if (value < percentage_threshold) {  # adjust threshold as needed
           text_color <- "red"
