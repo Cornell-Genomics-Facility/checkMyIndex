@@ -76,6 +76,7 @@ Illumina has developed four types of chemistry: the four-channel for the HiSeq a
 * Genomics Facility at Cornell version 1.2.0: modifications to include XLEAP-SBS chemistry
 * Genomics Facility at Cornell version 1.2.1: bug fix in check for index compatibility for XLEAP-SBS chemistry
 * Genomics Facility at Cornell version 1.2.2: bug fix in check for index compatibility when using multiple pools
+* Genomics Facility at Cornell version 1.2.3: bug fix in server code to use renderDT
 
 ## About checkMyIndex
 

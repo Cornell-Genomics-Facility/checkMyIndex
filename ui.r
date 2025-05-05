@@ -69,11 +69,11 @@ shinyUI(fluidPage(theme = "bootstrap.min.css", shinyjs::useShinyjs(),
                         tabPanel("Input indexes",
                                  value="inputIndexes",
                                  p(textOutput("textIndex")),
-                                 dataTableOutput("inputIndex"),
+                                 DT::DTOutput("inputIndex"),
                                  p(textOutput("textIndex2")),
-                                 dataTableOutput("inputIndex2"),
+                                 DT::DTOutput("inputIndex2"),
                                  p(textOutput("textPairingTable")),
-                                 dataTableOutput("pairingTable")),
+                                 DT::DTOutput("pairingTable")),
                         
                         # 2nd panel: results
                         tabPanel("Proposed flowcell design",
@@ -82,7 +82,7 @@ shinyUI(fluidPage(theme = "bootstrap.min.css", shinyjs::useShinyjs(),
                                    id="proposedSolution",
                                    p(textOutput("textDescribingSolution"),
                                      textOutput("compatibilityWarning")),
-                                   dataTableOutput("solution"),
+                                   DT::DTOutput("solution"),
                                    br(""),
                                    uiOutput("downloadButton")
                                  ))
@@ -95,7 +95,7 @@ shinyUI(fluidPage(theme = "bootstrap.min.css", shinyjs::useShinyjs(),
                                    id="colorBalancing",
                                    p(textOutput("textDescribingColorBalancing"),
                                      textOutput("compatibilityWarning2")),
-                                   dataTableOutput("colorPercentagesFormattedOutputWide"),
+                                   DT::DTOutput("colorPercentagesFormattedOutputWide"),
                                    br(""),
                                    uiOutput("downloadColorBalanceButton")
                                  ))

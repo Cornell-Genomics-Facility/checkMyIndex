@@ -70,7 +70,7 @@ shinyServer(function(input, output, session) {
   })
   output$indexUploaded <- reactive({!is.null(inputIndex())})
   outputOptions(output, "indexUploaded", suspendWhenHidden=FALSE)
-  output$inputIndex <- renderDataTable({inputIndex()}, options=list(paging=FALSE, searching=FALSE, info=FALSE))
+  output$inputIndex <- DT::renderDT({inputIndex()}, options=list(paging=FALSE, searching=FALSE, info=FALSE))
   output$textIndex <- renderText({tryCatch({
     index <- inputIndex()
     if (is.null(index)){
@@ -123,7 +123,7 @@ shinyServer(function(input, output, session) {
   })
   output$indexUploaded2 <- reactive({!is.null(inputIndex2())})
   outputOptions(output, "indexUploaded2", suspendWhenHidden=FALSE)
-  output$inputIndex2 <- renderDataTable({inputIndex2()}, options=list(paging=FALSE, searching=FALSE, info=FALSE))
+  output$inputIndex2 <- DT::renderDT({inputIndex2()}, options=list(paging=FALSE, searching=FALSE, info=FALSE))
   output$textIndex2 <- renderText({tryCatch({
     index2 <- inputIndex2()
     if (is.null(index2)){
@@ -150,7 +150,7 @@ shinyServer(function(input, output, session) {
       "The table below shows the pairing between the i7 and i5 input indices"
     }
   }, error = function(e) NULL)})
-  output$pairingTable <- renderDataTable({
+  output$pairingTable <- DT::renderDT({
     index <- inputIndex()
     index2 <- inputIndex2()
     if (is.null(index) | is.null(index2) || !input$i7i5pairing){
@@ -341,7 +341,7 @@ shinyServer(function(input, output, session) {
     }
   })
   
-  output$solution <- renderDataTable({
+  output$solution <- DT::renderDT({
     tryCatch({displaySolution()$solution}, error = function(e) NULL)
   }, options=list(paging=FALSE, searching=FALSE, info=FALSE))
   
@@ -359,10 +359,10 @@ shinyServer(function(input, output, session) {
   })
   
   # Render color balancing data table
-  # output$colorPercentagesFormattedOutputWide <- renderDataTable({
+  # output$colorPercentagesFormattedOutputWide <- DT::renderDT({
   #  tryCatch({displaySolution()$colorPercentagesFormattedOutputWide}, error = function(e) NULL)
   # }, options=list(paging=FALSE, searching=FALSE, info=FALSE))
-  output$colorPercentagesFormattedOutputWide <- renderDataTable({
+  output$colorPercentagesFormattedOutputWide <- DT::renderDT({
      tryCatch({displaySolution()$colorPercentagesFormattedOutputWide}, error = function(e) NULL)
    }, options = list(
      paging = FALSE, 
