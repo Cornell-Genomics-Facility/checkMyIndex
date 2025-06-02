@@ -54,20 +54,60 @@ shinyServer(function(input, output, session) {
   })
   
   # list of input index 1
-  inputIndex <- reactive({
+  inputIndexes <- reactive({
     # print('Input index 1 entered')
     if (testData() %in% c("simple", "dual")){
-      file <- ifelse(testData() == "simple", "www/inputIndexesExample.txt", "www/index24-i7.txt")
+      file <- ifelse(testData() == "simple", "www/inputIndexesExample.txt", "www/testCheckMyIndex-i7-i5.txt")
+      # file <- ifelse(testData() == "simple", "www/inputIndexesExample.txt", "index96_UDI-i7.txt")
+      # file <- ifelse(testData() == "simple", "www/inputIndexesExample.txt", "www/index24-i7.txt")
     } else{
       if (!is.null(fileInput())) file <- fileInput()$datapath else return(NULL)
     }
-    index <- tryCatch({readIndexesFileWithWeights(file)$index}, 
+    # print(paste0('file: ', file))
+    result <- tryCatch({readIndexesFileWithWeights(file)}, 
                       error = function(e) stop("An error occured when loading index 1 file, please check its structure."))
-    index <- addColors(index, input$chemistry)
+    # index <- tryCatch({readIndexesFileWithWeights(file)$index}, 
+    #                   error = function(e) stop("An error occured when loading index 1 file, please check its structure."))
+    # index <- addColors(index, input$chemistry)
     # print(paste0('index$color: ', index$color))
-    index$score <- scores(index$sequence)
-    return(index)
+    # index$score <- scores(index$sequence)
+    # return(index)
+    
+    if (!is.null(result$index2)) {
+      # Case with four columns
+      index <- addColors(result$index, input$chemistry)
+      index$score <- scores(index$sequence)
+      index2 <- addColors(result$index2, input$chemistry)
+      index2$score <- scores(index2$sequence)
+    } else {
+      # Case with two columns
+      index <- addColors(result$index, input$chemistry)
+      index$score <- scores(index$sequence)
+      index2 <- NULL
+
+      # Check inputFile2 as normal
+      # if (!is.null(inputFile2)) {
+      #   if (file.exists(inputFile2)) {
+      #     index2 <- readIndexesFileWithWeights(inputFile2)$index
+      #     index2 <- addColors(index2, input$chemistry)
+      #     index2$score <- scores(index2$sequence)
+      #   }
+      # } else {
+      #   index2 <- NULL
+      # }
+    }
+    
+    return(list(index = index, index2 = index2))
   })
+  
+  inputIndex <- reactive({
+    return(inputIndexes()$index)
+  })
+  
+  inputIndex2 <- reactive({
+    return(inputIndexes()$index2)
+  })
+  
   output$indexUploaded <- reactive({!is.null(inputIndex())})
   outputOptions(output, "indexUploaded", suspendWhenHidden=FALSE)
   output$inputIndex <- DT::renderDT({inputIndex()}, options=list(paging=FALSE, searching=FALSE, info=FALSE))
@@ -83,44 +123,46 @@ shinyServer(function(input, output, session) {
   }, error = function(e) NULL)})
   
   # list of input indices 2
-  inputIndex2 <- reactive({
-    # print('Input index 2 entered')
-    inputIndex()
-    if (testData() == "simple") return(NULL)
-    if (testData() == "dual"){
-        file2 <- "www/index24-i5.txt"
-    } else{
-        if (!is.null(fileInput2())){
-            if (is.null(inputIndex())) stop("Please load index 1 (i7) first.")
-            file2 <- fileInput2()$datapath
-        } else {
-            if (!is.null(inputIndex())){
-                file2 <- fileInput()$datapath
-            } else {
-                return(NULL)
-            }
-        }
-    }
-
-    # index2 <- tryCatch({readIndexesFileWithWeights(file2)$index}, 
-    #                    error = function(e) stop("An error occured when loading index 2 file, please check its structure."))
-    if (testData() == "dual" | !is.null(fileInput2())){
-       index2 <- tryCatch({readIndexesFileWithWeights(file2)$index}, 
-                      error = function(e) stop("An error occured when loading index 2 file, please check its structure."))
-    } else {
-       result <- tryCatch({readIndexesFileWithWeights(file2)}, 
-                        error = function(e) stop("An error occured when loading index 2 file, please check its structure."))
-       if (!is.null(result$index2)) {
-           index2 <- result$index2
-       } else {
-           return(NULL)
-       }
-    }
-    index2 <- addColors(index2, input$chemistry)
-    # print(paste0('index2$color: ', index2$color))
-    index2$score <- scores(index2$sequence)
-    return(index2)
-  })
+  # inputIndex2 <- reactive({
+  #   # print('Input index 2 entered')
+  #   inputIndex()
+  #   if (testData() == "simple") return(NULL)
+  #   if (testData() == "dual"){
+  #      # file2 <- "www/index24-i5.txt"
+  #      file2 <- "index96_UDI-i5.txt"  # //---
+  #   } else{
+  #      if (!is.null(fileInput2())){
+  #        if (is.null(inputIndex())) stop("Please load index 1 (i7) first.")
+  #        file2 <- fileInput2()$datapath
+  #      } else {
+  #        if (!is.null(inputIndex())){
+  #          file2 <- fileInput()$datapath
+  #        } else {
+  #          return(NULL)
+  #        }
+  #      }
+  #   }
+  #   print(paste0('file2: ', file2))
+    
+  #   # index2 <- tryCatch({readIndexesFileWithWeights(file2)$index}, 
+  #   #                    error = function(e) stop("An error occured when loading index 2 file, please check its structure."))
+  #   if (testData() == "dual" | !is.null(fileInput2())){
+  #      index2 <- tryCatch({readIndexesFileWithWeights(file2)$index}, 
+  #                     error = function(e) stop("An error occured when loading index 2 file, please check its structure."))
+  #   } else {
+  #      result <- tryCatch({readIndexesFileWithWeights(file2)}, 
+  #                       error = function(e) stop("An error occured when loading index 2 file, please check its structure."))
+  #      if (!is.null(result$index2)) {
+  #          index2 <- result$index2
+  #      } else {
+  #          return(NULL)
+  #      }
+  #   }
+  #   index2 <- addColors(index2, input$chemistry)
+  #   # print(paste0('index2$color: ', index2$color))
+  #   index2$score <- scores(index2$sequence)
+  #   return(index2)
+  # })
   output$indexUploaded2 <- reactive({!is.null(inputIndex2())})
   outputOptions(output, "indexUploaded2", suspendWhenHidden=FALSE)
   output$inputIndex2 <- DT::renderDT({inputIndex2()}, options=list(paging=FALSE, searching=FALSE, info=FALSE))
@@ -215,6 +257,7 @@ shinyServer(function(input, output, session) {
     index <- inputIndex()
     # print(paste0('column names: ', names(index)))
     # print(paste0('index[, -5]: ', index[, -5]))
+    # print(paste0('input$multiplexingRate: ', input$multiplexingRate))
     
     return(generateListOfIndexesCombinations(index = index[, -5],
                                              nbSamplesPerLane = as.numeric(input$multiplexingRate),
@@ -270,6 +313,20 @@ shinyServer(function(input, output, session) {
     }
   })
   
+  # Test function to print G / C counts
+  test_GC_counts <- function(colors) {
+    
+    # Convert the strings to a character matrix (rows = strings, columns = positions)
+    char_matrix <- do.call(rbind, strsplit(colors, split = ""))
+    
+    # Count the number of G or C characters at each position
+    gc_counts <- colSums(char_matrix == "G" | char_matrix == "C")
+    
+    # Output the result
+    print(paste0('gc_counts: ', gc_counts))
+    
+  }
+  
   # display the solution
   displaySolution <- eventReactive(input$go, {
     shinyjs::hide("proposedSolution")
@@ -321,13 +378,58 @@ shinyServer(function(input, output, session) {
                                  i7i5pairing = input$i7i5pairing)
         
         # Calculate the percentage of each character in each position of color1 and color2
-        solution_color_percentages_with_weights <- calculate_color_percentages_with_weights(solution)
+        results <- calculate_color_percentages_with_weights(solution)
+        solution_color_percentages_with_weights <- results$solution_color_percentages
         colorPercentagesFormattedOutputWide <- convert_to_formatted_output_wide(solution_color_percentages_with_weights)
         # areIndicesCompatible <- !sapply(split(solution, solution$pool), areIndexesCompatible, input$chemistry)
-        areIndicesCompatible = all(solution$areIndicesCompatible)
+        # areIndicesCompatible = all(solution$areIndicesCompatible)
+        
+        # print('displaySolution')
+        # split_result <- split(solution, solution$pool)
+        # print(paste0("split_result[[1]]: ", split_result[[1]]))
+        # print(paste0("names(split_result[[1]]): ", names(split_result[[1]])))
+        
+        # result <- areIndexesCompatible(split_result[[1]], input$chemistry, column="color1")
+        # print(paste0("result: ", result))
         # print(paste0("split(solution, solution$pool): ", split(solution, solution$pool)))
         # print(paste0("solution: ", solution))
+        # print(paste0("solution$areIndicesCompatible: ", solution$areIndicesCompatible))
+        # print(paste0("sapply(split(solution, solution$pool), areIndexesCompatible, input$chemistry, color1): ",sapply(split(solution, solution$pool), areIndexesCompatible, input$chemistry, "color1")))
+
+        # print(paste0("all(sapply(split(solution, solution$pool), areIndexesCompatible, input$chemistry, color1)): ",all(sapply(split(solution, solution$pool), areIndexesCompatible, input$chemistry, "color1"))))
+        # print(paste0("all(sapply(split(solution, solution$pool), areIndexesCompatible, input$chemistry, color2)): ",all(sapply(split(solution, solution$pool), areIndexesCompatible, input$chemistry, "color2"))))
+        
+        # test_GC_counts(solution$color1)
+        # print(paste0("solution_color_percentages_with_weights: ", solution_color_percentages_with_weights))
+        
+        # if (all(sapply(split(solution, solution$pool), areIndexesCompatible, input$chemistry, "color1")) & all(sapply(split(solution, solution$pool), areIndexesCompatible, input$chemistry, "color2"))) {
+        #   areIndicesCompatible <- TRUE
+        # } else {
+        #   areIndicesCompatible <- FALSE
+        # }
+        
+        # Check which columns exist
+        if ("color" %in% names(solution)) {
+          # Single color case
+          areIndicesCompatible <- all(sapply(split(solution, solution$pool), 
+                                             areIndexesCompatible, 
+                                             input$chemistry, 
+                                             "color"))
+        } else if (all(c("color1", "color2") %in% names(solution))) {
+          # Dual color case
+          areIndicesCompatible <- all(sapply(split(solution, solution$pool), 
+                                             areIndexesCompatible, 
+                                             input$chemistry, 
+                                             "color1")) & 
+                                  all(sapply(split(solution, solution$pool), 
+                                             areIndexesCompatible, 
+                                             input$chemistry, 
+                                            "color2"))
+        }
         # print(paste0("areIndicesCompatible: ", areIndicesCompatible))
+        # test_GC_counts(c(solution$color1, solution$color2))
+        
+        # print(paste0("solution_color_percentages_with_weights: ", solution_color_percentages_with_weights))
         
       }, message="R is looking for a solution...", max=0)
       shinyjs::show("proposedSolution")

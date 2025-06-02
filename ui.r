@@ -36,7 +36,7 @@ shinyUI(fluidPage(theme = "bootstrap.min.css", shinyjs::useShinyjs(),
                         selectizeInput("testdata", label="Load test indices",
                                        choices=c("None"="none",
                                                  "24 indices 1 (i7)"="simple",
-                                                 "6 indices 1 (i7) and 4 indices 2 (i5)"="dual"))
+                                                 "27 indices 1 (i7) and 27 indices 2 (i5)"="dual"))
                       }),
                       
                       # parameters
@@ -115,38 +115,21 @@ shinyUI(fluidPage(theme = "bootstrap.min.css", shinyjs::useShinyjs(),
                         # //--- add text for combined file and XLEAP chemistry
                         tabPanel("Help",
                                  
+                                 h3("What checkMyIndex does"),
+                                 p("Searches for a set of compatible indices for your sequencing experiment according to the number of samples and the desired multiplexing rate (i.e. number 
+                                   of samples per pool/lane). The app returns the best, color balanced solution it can find (assuming one exists) from the number of trials you select (note: 
+                                   better solutions may be found by running for more trials, but this takes longer to run)."),
+
                                  h3("Input index file(s)"),
                                  p("The user must provide the available indices either as a four-column tab-delimited text file without header or as two-column tab-delimited text file(s) 
                                    without header. In the case of the four-column file, the i7 / i5 index ids are in the first column, the i7 sequences are in the second column, the i5 
-                                   sequences are in the third column, and the weights are in the fourth column. 
-                                   In the case of the two-column file(s), index ids are in the first column and corresponding sequences in the second. An example of such a two-column file is 
-                                   available in the GitHub repository and also ", a("here", href="inputIndexesExample.txt", target="blank", download="inputIndexesExample.txt")," to test the 
-                                   application. 
-                                   Note that for dual-indexing sequencing experiments the first file corresponds to indices 1 (i7) and the second file to indices 2 (i5).
-                                   Example files for dual-indexing are available ",
-                                   a("here", href="index24-i7.txt", target="blank", download="index24-i7.txt"), " (index 1) and ", 
-                                   a("here", href="index24-i5.txt", target="blank", download="index24-i5.txt"), " (index 2)."),
-                                 
-                                 h3("How the algorithm works"),
-                                 p("There can be many combinations of indices to check according to the number of input indices and the multiplexing rate. Thus, testing for 
-                                    the compatibility of all the combinations may be long or even impossible. The trick is to find a partial solution with the desired number 
-                                    of pools/lanes but with fewer samples than asked and then to complete each pool/lane with some of the remaining indices to reach the desired 
-                                    multiplexing rate. Indeed, adding indices to a combination of compatible indices will give a compatible combination for sure. Briefly, a lower 
-                                    number of samples per pool/lane generates a lower number of combinations to test and thus makes the research of a partial solution very fast. 
-                                    Adding some indices to complete each pool/lane is fast too and gives the final solution."),
-                                 p("Unfortunately, the research of a final solution might become impossible as the astuteness reduces the number of combinations of indices
-                                    In such a case, one can look for a solution using directly the desired multiplexing rate (see parameters), the only risk is to increase 
-                                    the computational time."),
-                                 
+                                   sequences are in the third column, and the weights are in the fourth column. In the case of the two-column file(s), index ids are in the first column and 
+                                   corresponding sequences in the second. Examples of both a four-column and a two-column file are available in the GitHub repository ", 
+                                   a("here", href="https://github.com/Cornell-Genomics-Facility/checkMyIndex/blob/master/www/testCheckMyIndex-i7-i5.txt", target="blank", download="testCheckMyIndex-i7-i5.txt"), 
+                                   "and ", a("here", href="https://github.com/Cornell-Genomics-Facility/checkMyIndex/blob/master/www/inputIndexesExample.txt", target="blank", download="inputIndexesExample.txt"), 
+                                   "to test the application."),
+
                                  h3("Parameters"),
-                                 p(strong("Illumina chemistry"), "can be either four-channels (HiSeq & MiSeq), two-channels (original SBS and XLEAP-SBS) or one-channel (iSeq 100).
-                                   With the four-channel chemistry, a red laser detects A/C bases and a green laser detects G/T bases and the indices are compatible if there is at 
-                                   least one red light and one green light at each position. With the two-channel chemistry (original SBS), G bases have no color, A bases are 
-                                   orange, C bases are red and T bases are green and indices are compatible if there is at least one color at each position. For two-channel XLEAP-SBS chemistry, 
-                                   G bases have no color, A bases are blue, C bases are Blue+Green (Cyan) and T bases are green and indices are compatible if there is at least one color at each 
-                                   position. Note that indices starting with GG are not compatible with the two-channel chemistry. With the one-channel chemistry, compatibility cannot be 
-                                   defined with colors and indices are compatible if there is at least one A or C or T base at each position. Please refer to the Illumina documentation for more 
-                                   detailed information on the different chemistries."),
                                  p(strong("Total number of samples"), "in your experiment (can be greater than the number of available indices)."),
                                  p(strong("Multiplexing rate"), "i.e. number of samples per pool/lane (only divisors of the total number of samples are proposed)."),
                                  p(strong("i7 and i5 pairing"), "(only for dual-indexing) is proposed if there are as many i5 as i7 indices to deal with Illumina Unique Dual-Indices (UDI).
@@ -156,6 +139,27 @@ shinyUI(fluidPage(theme = "bootstrap.min.css", shinyjs::useShinyjs(),
                                            with a few samples per pool/lane and then add some of the remaining indices to reach the desired multiplexing rate."),
                                  p(strong("Select compatible indices"), "(only for single-indexing) before looking for a (partial) solution can take some time but then speed up the algorithm."),
                                  p(strong("Maximum number of trials"), "can be increased if a solution is difficult to find with the parameters chosen."),
+                                 
+                                 h3("How the algorithm works"),
+                                 p("There can be many combinations of indices to check according to the number of input indices and the multiplexing rate. Thus, testing for 
+                                    the compatibility of all the combinations may be long or even impossible. The trick is to find a partial solution with the desired number 
+                                    of pools/lanes but with fewer samples than asked and then to complete each pool/lane with some of the remaining indices to reach the desired 
+                                    multiplexing rate. Indeed, adding indices to a combination of compatible indices will give a compatible combination. Briefly, a lower 
+                                    number of samples per pool/lane generates a lower number of combinations to test and thus makes the research of a partial solution very fast. 
+                                    Adding some indices to complete each pool/lane is fast too and gives the final solution."),
+                                 p("Unfortunately, the research of a final solution might become impossible as the astuteness reduces the number of combinations of indices.
+                                    In such a case, one can look for a solution using directly the desired multiplexing rate (see parameters), the only risk is to increase 
+                                    the computational time."),
+                                 
+                                 h3("Background on Illumina chemistry and color balancing"),
+                                 p(strong("Illumina chemistry"), "can be either four-channels (HiSeq & MiSeq), two-channels (original SBS and XLEAP-SBS) or one-channel (iSeq 100).
+                                   With the four-channel chemistry, a red laser detects A/C bases and a green laser detects G/T bases and the indices are compatible if there is at 
+                                   least one red light and one green light at each position. With the two-channel chemistry (original SBS), G bases have no color, A bases are 
+                                   orange, C bases are red and T bases are green and indices are compatible if there is at least one color at each position. For two-channel XLEAP-SBS chemistry, 
+                                   G bases have no color, A bases are blue, C bases are Blue+Green (Cyan) and T bases are green and indices are compatible if there is at least one color at each 
+                                   position. Note that indices starting with GG are not compatible with the two-channel chemistry. With the one-channel chemistry, compatibility cannot be 
+                                   defined with colors and indices are compatible if there is at least one A or C or T base at each position. Please refer to the Illumina documentation for more 
+                                   detailed information on the different chemistries."),
 
                                  h3("About"),
                                  p("The original application was developed at the Biomics pole of the Institut Pasteur by Hugo Varet and an ", a("Application Note", href="https://doi.org/10.1093/bioinformatics/bty706"), 

@@ -5,7 +5,7 @@ library(tidyr)
 library(stringr)
 
 checkMyIndexVersion <- "1.0.2"
-cornellCheckMyIndexVersion <- "1.2.0"
+cornellCheckMyIndexVersion <- "1.3.0"
 
 readIndexesFile <- function(file){
   index <- tryCatch({read.table(file, header=FALSE, sep="\t", stringsAsFactors=FALSE, col.names=c("id","sequence"))},
@@ -117,6 +117,20 @@ distNindexes <- function(sequences){
 # the score of each index is the minimum number of mismatches with the others
 scores <- function(sequences) apply(distNindexes(sequences), 2, min)
 
+# Test function to print G / C counts
+test_GC_counts <- function(colors) {
+
+  # Convert the strings to a character matrix (rows = strings, columns = positions)
+  char_matrix <- do.call(rbind, strsplit(colors, split = ""))
+  
+  # Count the number of G or C characters at each position
+  gc_counts <- colSums(char_matrix == "G" | char_matrix == "C")
+  
+  # Output the result
+  print(paste0('gc_counts: ', gc_counts))
+  
+}
+
 areIndexesCompatible <- function(index, chemistry, column="color"){
   # return TRUE if the input indices are compatible (i.e. can be used within the same pool/lane)
   # print('areIndexesCompatible')
@@ -152,6 +166,14 @@ areIndexesCompatible <- function(index, chemistry, column="color"){
     # Return true only if all positions pass and at least one position has green
     # return(all(positionCheck) && any(sumGreen >= 1))
     
+    # print(paste0('index: ', index))
+    # print(paste0('sumGreen: ', sumGreen))
+    # print(paste0('all(sumGreen >= 1): ', all(sumGreen >= 1)))
+    
+    # print('areIndexesCompatible:')
+    # test_GC_counts(index$color)
+    # stop("Halting script.")
+    
     # Check if each position has at least one green
     return(all(sumGreen >= 1))
   }
@@ -166,8 +188,16 @@ generateListOfIndexesCombinations <- function(index, nbSamplesPerLane, completeL
   # remove indices starting with GG if two-channel chemistry
   if (chemistry == "2") index <- index[!sapply(index$sequence, substr, 1, 2) == "GG",]
   nbSamplesPerLane <- min(nrow(index), nbSamplesPerLane)
+
+  # print('generateListOfIndexesCombinations')
+  # print(paste0('nrow(index): ', nrow(index)))
+  # print(paste0('nbSamplesPerLane: ', nbSamplesPerLane))
+  # print(paste0('completeLane: ', completeLane))
+  # print(paste0('choose(nrow(index), nbSamplesPerLane): ', choose(nrow(index), nbSamplesPerLane)))
+  
   # optimize nbSamplesPerLane to generate a reduced number of combinations of indices
   while (!completeLane & choose(nrow(index), nbSamplesPerLane) > 2e5 & nbSamplesPerLane > 2) nbSamplesPerLane <- nbSamplesPerLane - 1
+  # print(paste0('nbSamplesPerLane: ', nbSamplesPerLane))
   # stop if too many combinations to test
   if (choose(nrow(index), nbSamplesPerLane) > 1e9) stop("Too many candidate combinations of indices to easily find a solution, please use different parameters.")
   # generate the list of all the possible combinations
@@ -177,6 +207,10 @@ generateListOfIndexesCombinations <- function(index, nbSamplesPerLane, completeL
   # select only combinations of compatible indices before searching for a solution
   if (selectCompIndexes) indexesCombinations <- indexesCombinations[parSapply(cl=Clust, X=indexesCombinations, FUN=areIndexesCompatible, chemistry=chemistry)]
   stopCluster(Clust)
+  
+  # print(paste0('indexesCombinations: ', indexesCombinations))
+  # stop("Halting script.")
+  
   return(indexesCombinations)
 }
 
@@ -210,10 +244,11 @@ searchOneSolution <- function(indexesList, index, indexesList2=NULL, index2=NULL
           # if (areIndexesCompatible(indexesList[[i]], chemistry, "color")){
           # areIndicesCompatible <- areIndexesCompatible(indexesList[[i]], chemistry, "color")
           # print(paste0('areIndicesCompatible before: ', areIndexesCompatible(indexesList[[i]], chemistry, "color")))
+          # print('Came from searchOneSolution1')
           if (is.null(areIndicesCompatible) || areIndicesCompatible) {
             areIndicesCompatible <- areIndexesCompatible(indexesList[[i]], chemistry, "color")
           }
-          print(paste0('areIndicesCompatible: ', areIndicesCompatible))
+          # print(paste0('areIndicesCompatible: ', areIndicesCompatible))
           compatibleCombinations[[k]] <- indexesList[[i]]
           # remove either the combination used or all the combinations for which an index has already been selected
           if (unicityConstraint=="index") indexesList <- indexesList[!sapply(indexesList, function(tab) any(tab$id %in% indexesList[[i]]$id))]
@@ -226,10 +261,13 @@ searchOneSolution <- function(indexesList, index, indexesList2=NULL, index2=NULL
           # if (areIndexesCompatible(indexesList[[i]], chemistry, "color") & areIndexesCompatible(indexesList[[i]], chemistry, "color2")){
           # areIndicesCompatible <- (areIndexesCompatible(indexesList[[i]], chemistry, "color") & areIndexesCompatible(indexesList[[i]], chemistry, "color2"))
           # print(paste0('areIndicesCompatible before: ', (areIndexesCompatible(indexesList[[i]], chemistry, "color") & areIndexesCompatible(indexesList[[i]], chemistry, "color2"))))
+          # print('Came from searchOneSolution2')
+          # print(paste0('i: ', i))
+          # print(paste0('indexesList[[i]]: ', indexesList[[i]]))
           if (is.null(areIndicesCompatible) || areIndicesCompatible) {
             areIndicesCompatible <- (areIndexesCompatible(indexesList[[i]], chemistry, "color") & areIndexesCompatible(indexesList[[i]], chemistry, "color2"))
           }
-          print(paste0('areIndicesCompatible: ', areIndicesCompatible))
+          # print(paste0('areIndicesCompatible: ', areIndicesCompatible))
           compatibleCombinations[[k]] <- indexesList[[i]]
           k <- k+1
           # } else{
@@ -306,6 +344,7 @@ searchOneSolution <- function(indexesList, index, indexesList2=NULL, index2=NULL
         # print(paste0("i: ", i))
         # if (areIndexesCompatible(indexesList[[i]], chemistry)){
         # areIndexesCompatible <- ((areIndexesCompatible(indexesList[[i]], chemistry)) & (areIndexesCompatible(indexesList2[[i2]], chemistry)))
+        # print('Came from searchOneSolution3')
         if (is.null(areIndicesCompatible) || areIndicesCompatible) {
           areIndexesCompatible <- ((areIndexesCompatible(indexesList[[i]], chemistry)) & (areIndexesCompatible(indexesList2[[i2]], chemistry)))
         }
@@ -412,207 +451,6 @@ searchOneSolution <- function(indexesList, index, indexesList2=NULL, index2=NULL
   }
 }
 
-searchOneSolution_old_040225 <- function(indexesList, index, indexesList2=NULL, index2=NULL,
-                              nbLanes, multiplexingRate, unicityConstraint, chemistry,
-                              i7i5pairing){
-  # goal: look for a solution (i.e. a combination of combination of indices) such that
-  #  - each index is used only once if required (unicityConstraint = index)
-  #  - each combination of indices is used only once if required (unicityConstraint = lane)
-  # two steps:
-  #  1) fill the lanes with as many samples per lane as in indexesList (may be lower than multiplexingRate for optimization purposes)
-  #  2) if this number is lower than the desired multiplexing rate, complete the solution returned at step 1 adding indices
-  # this function can return NULL if no solution is found (need to re-run in that case)
-  inputNbSamplesPerLane <- nrow(indexesList[[1]])
-  compatibleCombinations <- vector(mode="list", length=nbLanes)
-  
-  # single-indexing or paired dual-indexing
-  if (is.null(index2) | is.null(indexesList2)){
-    k <- 1
-    # print(paste0('nbLanes: ', nbLanes))
-    while (k <= nbLanes){
-      
-      #  print(paste0('compatibleCombinations: ', compatibleCombinations))
-      if (length(indexesList) == 0){
-        # no available combination of indices anymore, try again!
-        return(NULL)
-      } else{
-        i <- sample(1:length(indexesList), 1, FALSE)
-        if (!i7i5pairing){
-          if (areIndexesCompatible(indexesList[[i]], chemistry, "color")){
-            compatibleCombinations[[k]] <- indexesList[[i]]
-            # remove either the combination used or all the combinations for which an index has already been selected
-            if (unicityConstraint=="index") indexesList <- indexesList[!sapply(indexesList, function(tab) any(tab$id %in% indexesList[[i]]$id))]
-            if (unicityConstraint=="lane") indexesList <- indexesList[-i]
-            k <- k+1
-          } else{
-            indexesList <- indexesList[-i]
-          }
-        } else{
-          if (areIndexesCompatible(indexesList[[i]], chemistry, "color") & areIndexesCompatible(indexesList[[i]], chemistry, "color2")){
-            compatibleCombinations[[k]] <- indexesList[[i]]
-            k <- k+1
-          } else{
-            indexesList <- indexesList[-i]
-          }
-        }
-      }
-      
-    }
-    
-    solution <- data.frame(sample=1:(nbLanes*inputNbSamplesPerLane), 
-                           pool=rep(1:nbLanes, each=inputNbSamplesPerLane), 
-                           do.call("rbind", compatibleCombinations))
-    if (multiplexingRate > inputNbSamplesPerLane){
-      # only a partial solution has been found, need to complete it
-      if (chemistry == "2"){
-        index <- index[!(sapply(index$sequence, substr, 1, 2) == "GG"),]
-        if (i7i5pairing) index <- index[!(sapply(index$sequence2, substr, 1, 2) == "GG"),]
-      }
-      solution <- completeSolution(partialSolution = solution,
-                                   index = index,
-                                   multiplexingRate = multiplexingRate,
-                                   unicityConstraint = unicityConstraint)
-    }
-    if (!is.null(solution)){
-      if (i7i5pairing){
-        names(solution)[3:6] <- paste0(names(solution)[3:6], "1")
-        solution$score1 <- unlist(tapply(solution$sequence1, solution$pool, scores))
-        solution$score2 <- unlist(tapply(solution$sequence2, solution$pool, scores))
-        # re-order columns
-        # print(paste0('Solution names: ', names(solution)))
-        # print(paste0('Solution before reorder columns: ', solution$weight1))
-        solution <- solution[, c("sample", "pool", 
-                                 "id1", "sequence1", "color1", "score1", "weight1", 
-                                 "id2", "sequence2", "color2", "score2", "weight2")]
-      } else{
-        solution$score <- unlist(tapply(solution$sequence, solution$pool, scores))
-      }
-    }
-    # solution$areIndicesCompatible <- TRUE
-    return(solution)
-    # dual-indexing without pairing
-  } else {
-    # reminder: unicityConstraint has been set to "none" to simplify the algorithm
-    # and also because it is not so important with dual-indexing
-    inputNbSamplesPerLane2 <- nrow(indexesList2[[1]])
-    compatibleCombinations2 <- vector(mode="list", length=nbLanes)
-    k <- 1
-    # print('Second while loop: ')
-    # print(paste0('nbLanes: ', nbLanes))
-    
-    while (k <= nbLanes){
-      # print(paste0("Start of while loop, k: ", k))
-      # print(paste0("length(indexesList) in global.r: ", length(indexesList)))
-      # print(paste0("length(indexesList2) in global.r: ", length(indexesList2)))
-      if (length(indexesList) == 0 | length(indexesList2) == 0){
-        # no available combination of indices anymore, try again!
-        return(NULL)
-      } else{
-        i <- sample(1:length(indexesList), 1, FALSE)
-        # print(paste0("i: ", i))
-        if (areIndexesCompatible(indexesList[[i]], chemistry)){
-          # print('Got to compatibleCombinations')
-          compatibleCombinations[[k]] <- indexesList[[i]]
-          i2 <- ifelse(i7i5pairing, i, sample(1:length(indexesList2), 1, FALSE))
-          if (areIndexesCompatible(indexesList2[[i2]], chemistry)){
-            compatibleCombinations2[[k]] <- indexesList2[[i2]]
-            k <- k+1
-          } else{
-            indexesList2 <- indexesList2[-i2]
-          }
-        } else{
-          # print('Got to indexesList <- indexesList[-i]')
-          indexesList <- indexesList[-i]
-        }
-      }
-      # print(paste0("End of while loop, k: ", k))
-    }
-    # print('Got past second while loop')
-    solution <- data.frame(sample=1:(nbLanes*inputNbSamplesPerLane), 
-                           pool=rep(1:nbLanes, each=inputNbSamplesPerLane), 
-                           do.call("rbind", compatibleCombinations))
-    solution2 <- data.frame(sample=1:(nbLanes*inputNbSamplesPerLane2), 
-                            pool=rep(1:nbLanes, each=inputNbSamplesPerLane2), 
-                            do.call("rbind", compatibleCombinations2))
-    
-    # print(paste0('Solution: ', solution))
-    
-    # remove indices starting with GG before completing the solutions if four-channel chemistry
-    if (chemistry == "2"){
-      index <- index[!sapply(index$sequence, substr, 1, 2) == "GG",]
-      index2 <- index2[!sapply(index2$sequence, substr, 1, 2) == "GG",]
-    }
-    # only a partial solution has been found, need to complete it
-    if (min(multiplexingRate, nrow(index)) > inputNbSamplesPerLane){
-      solution <- completeSolution(partialSolution = solution,
-                                   index = index,
-                                   multiplexingRate = min(multiplexingRate, nrow(index)),
-                                   unicityConstraint = unicityConstraint)
-    }
-    if (min(multiplexingRate, nrow(index2)) > inputNbSamplesPerLane2){
-      solution2 <- completeSolution(partialSolution = solution2,
-                                    index = index2,
-                                    multiplexingRate = min(multiplexingRate, nrow(index2)),
-                                    unicityConstraint = unicityConstraint)
-    }
-    names(solution) <- paste0(names(solution), "1")
-    names(solution2) <- paste0(names(solution2), "2")
-    # generate all the possible couple of indices
-    solution.merged <- merge(solution, solution2, by.x="pool1", by.y="pool2")
-    solution <- list()
-    for (pool in unique(solution.merged$pool1)){
-      # look for the most diverse couple of indices can be slightly difficult
-      # we thus encapsulate it into a while() loop
-      solution.pool.OK <- FALSE
-      while (!solution.pool.OK){
-        solution.merged.pool <- solution.merged[which(solution.merged$pool1 == pool),]
-        counts.id1 <- numeric(length(unique(solution.merged.pool$id1)))
-        names(counts.id1) <- unique(solution.merged.pool$id1)
-        counts.id2 <- numeric(length(unique(solution.merged.pool$id2)))
-        names(counts.id2) <- unique(solution.merged.pool$id2)
-        solution.tmp.pool <- NULL
-        for (i in 1:multiplexingRate){
-          for (k in sample(1:nrow(solution.merged.pool), nrow(solution.merged.pool), FALSE)){
-            counts.id1.k <- counts.id1 + I(names(counts.id1) == solution.merged.pool[k, "id1"])
-            counts.id2.k <- counts.id2 + I(names(counts.id2) == solution.merged.pool[k, "id2"])
-            maxdiff <- function(x) max(x) - min(x)
-            # make sure no index is used n+2 times and another n times
-            # i.e. indices must be used a homogeneous number of times
-            if (maxdiff(counts.id1.k) <= 1 & maxdiff(counts.id2.k) <= 1){
-              counts.id1 <- counts.id1.k
-              counts.id2 <- counts.id2.k
-              solution.tmp.pool <- rbind(solution.tmp.pool, solution.merged.pool[k,])
-              solution.merged.pool <- solution.merged.pool[-k,]
-              break
-            }
-          }
-        }
-        if (nrow(solution.tmp.pool) == multiplexingRate) solution.pool.OK <- TRUE
-      }
-      solution[[pool]] <- solution.tmp.pool
-    }
-    solution <- do.call("rbind", solution)
-    solution <- solution[order(solution$pool1, solution$id1, solution$id2),]
-    # add scores
-    solution$score1 <- unlist(tapply(solution$sequence1, solution$pool, scores))
-    solution$score2 <- unlist(tapply(solution$sequence2, solution$pool, scores))
-    solution <- data.frame(sample=1:(nbLanes*multiplexingRate),
-                           pool=solution$pool1,
-                           id1=solution$id1,
-                           sequence1=solution$sequence1,
-                           color1=solution$color1,
-                           score1=solution$score1,
-                           weight1=solution$weight1,
-                           id2=solution$id2,
-                           sequence2=solution$sequence2,
-                           color2=solution$color2,
-                           score2=solution$score2,
-                           weight2=solution$weight2,
-                           stringsAsFactors = FALSE)
-    return(solution)
-  }
-}
-
 completeSolution <- function(partialSolution, index, multiplexingRate, unicityConstraint){
   nbSamplesToAdd <- multiplexingRate - nrow(partialSolution)/max(partialSolution$pool) # to each lane
   partialSolution$sample <- NULL
@@ -635,9 +473,56 @@ completeSolution <- function(partialSolution, index, multiplexingRate, unicityCo
   return(finalSolution)
 }
 
+calculateSolutionScore <- function(solution, chemistry, percentage_threshold, distance_threshold) {
+  
+  solution_color_percentages_list <- calculate_color_percentages_with_weights(solution)
+
+  if (chemistry == "X") {
+    percentages_vector <- solution_color_percentages_list$vector_gb
+  } else {
+    percentages_vector <- solution_color_percentages_list$vector_rg
+  }
+
+  # Check condition
+  if ("score" %in% names(solution)) {
+    # Single score case
+    distance_metric <- if (any(solution$score < distance_threshold)) 0 else 1
+  } else if (all(c("score1", "score2") %in% names(solution))) {
+    # Dual score case
+    distance_metric <- if (any(solution$score1 < distance_threshold) || 
+                           any(solution$score2 < distance_threshold)) 0 else 1
+  } 
+  
+  # Check condition
+  # if (any(solution$score1 < distance_threshold) || any(solution$score2 < distance_threshold)) {
+  #   distance_metric <- 0
+  # } else {
+  #   distance_metric <- 1
+  # }
+  
+  # cat(solution$score1, solution$score2, "\n")
+  # print(paste0('distance_metric: ', distance_metric))
+  
+  count_of_values_below_threshold <- sum(percentages_vector < percentage_threshold)
+  rank_score = (mean(percentages_vector) + min(percentages_vector)) / (1 + count_of_values_below_threshold)
+  
+  # cat(percentages_vector, "\n")
+  # print(paste0('count_of_values_below_threshold: ', count_of_values_below_threshold))
+  # print(paste0('rank_score: ', rank_score))
+  
+  return(list(rank_score = rank_score, distance_metric = distance_metric))
+
+  # For now, just return a random integer between 1 and 100
+  # return(sample(1:100, 1))
+}
+
 findSolution <- function(indexesList, index, indexesList2=NULL, index2=NULL,
                          nbSamples, multiplexingRate, unicityConstraint, nbMaxTrials, 
                          completeLane, selectCompIndexes, chemistry, i7i5pairing){
+
+  percentage_threshold <- 25
+  distance_threshold <- 3
+  
   # this function run searchOneSolution() nbMaxTrials times until finding a solution based on the parameters defined
   if (!unicityConstraint %in% c("none", "index", "lane")) stop("unicityConstraint parameter must be equal to 'none', 'lane' or 'index'.")
   if (unicityConstraint=="index" & nbSamples > nrow(index)) stop("More samples than available indices: cannot use each index only once.")
@@ -647,7 +532,15 @@ findSolution <- function(indexesList, index, indexesList2=NULL, index2=NULL,
   if (unicityConstraint!="none" & completeLane & selectCompIndexes & length(indexesList) < nbLanes){
     stop("There are only ", length(indexesList), " combinations of compatible indices to fill ", nbLanes, " lanes.")
   }
+  
+  # Initialize an empty list to store solutions and their scores
+  solutions_list <- list()
+  last_non_null_solution <- NULL  # Track the last non-null solution
+  
   nbTrials <- 1
+  if (nbSamples == multiplexingRate) {
+    nbMaxTrials <- 1  # Only need a single trial if there is only one pool
+  }
   while (nbTrials <= nbMaxTrials){
     solution <- searchOneSolution(indexesList = indexesList,
                                   index = index,
@@ -658,27 +551,103 @@ findSolution <- function(indexesList, index, indexesList2=NULL, index2=NULL,
                                   unicityConstraint = unicityConstraint,
                                   chemistry = chemistry,
                                   i7i5pairing = i7i5pairing)
-    # print(paste0("nbTrials: ", nbTrials))
+    
     if (!is.null(solution)){
+      last_non_null_solution <- solution  # Update the last non-null solution
       # check solution only for single-indexing as dual-indexing has no constraint
       if (is.null(indexesList2) & is.null(index2) & !i7i5pairing){
-        if (checkProposedSolution(solution = solution, unicityConstraint = unicityConstraint, chemistry = chemistry) | nbTrials == nbMaxTrials) {
-          return(solution)
-        } else {
-          nbTrials <- nbTrials + 1
+        if (checkProposedSolution(solution = solution, unicityConstraint = unicityConstraint, chemistry = chemistry)) {
+          # Store valid solution with its score
+          calculateSolutionScore_result = calculateSolutionScore(solution, chemistry, percentage_threshold, distance_threshold)
+          solutions_list[[nbTrials]] <- list(
+            solution = solution,
+            score = calculateSolutionScore_result$rank_score,
+            distance_metric = calculateSolutionScore_result$distance_metric
+          )
         }
       } else{
-        if (checkProposedSolution2(solution = solution, chemistry = chemistry) | nbTrials == nbMaxTrials) {
-          return(solution)
-        } else {
-          nbTrials <- nbTrials + 1
+        if (checkProposedSolution2(solution = solution, chemistry = chemistry)) {
+          # Store valid solution with its score
+          calculateSolutionScore_result = calculateSolutionScore(solution, chemistry, percentage_threshold, distance_threshold)
+          solutions_list[[nbTrials]] <- list(
+            solution = solution,
+            score = calculateSolutionScore_result$rank_score,
+            distance_metric = calculateSolutionScore_result$distance_metric
+          )
         }
       }
-      # return(solution)
-    } else{
-      nbTrials <- nbTrials + 1
     }
+    nbTrials <- nbTrials + 1
   }
+
+  # First, check if we have any solutions in our list
+  valid_solutions <- solutions_list[!sapply(solutions_list, is.null)]
+  
+  # print(paste0("solutions_list: ", solutions_list))
+  # print(paste0("valid_solutions: ", valid_solutions))
+  # print(paste0("length(valid_solutions): ", length(valid_solutions)))
+  # print(paste0("last_non_null_solution: ", last_non_null_solution))
+  
+  # If solutions were found, return the one with highest score
+  # Otherwise, return the last solution and show a warning message
+  if (length(valid_solutions) > 0) {
+    # Only create solutions_df if we have valid solutions
+    solutions_df <- do.call(rbind, lapply(valid_solutions, function(x) {
+      # print(str(x))
+      # print('\nfindSolution1:')
+      # test_GC_counts(c(x$solution$color1, x$solution$color2))
+      data.frame(
+        solution = I(list(x$solution)),
+        score = as.numeric(x$score),
+        distance_metric = as.numeric(x$distance_metric)
+      )
+    }))
+    
+    # solutions_df <- tryCatch({
+    #   do.call(rbind, lapply(valid_solutions, function(x) {
+    #     print(str(x))
+    #     data.frame(
+    #       solution = I(list(if (!is.null(x$solution)) x$solution else NA)),
+    #       score = if (!is.null(x$score) && length(x$score) > 0) x$score else NA,
+    #       distance_metric = if (!is.null(x$distance_metric) && length(x$distance_metric) > 0) x$distance_metric else NA
+    #     )
+    #   }))
+    # }, error = function(e) {
+    #   print(paste("Error in solutions_df:", e$message))  # Console
+    #   showNotification(paste("Error:", e$message), type = "error")  # UI
+    #   return(NULL)
+    # })
+    
+    # best_solution <- solutions_df[which.max(solutions_df$score), "solution"][[1]]
+    # First, try to find the best among distance_metric == 1
+    preferred_solutions <- subset(solutions_df, distance_metric == 1)
+    
+    # print(paste0("solutions_df$score: ", solutions_df$score))
+    # print(paste0("solutions_df$distance_metric: ", solutions_df$distance_metric))
+    # print(paste0("preferred_solutions$score: ", preferred_solutions$score))
+    # print(paste0("preferred_solutions$distance_metric: ", preferred_solutions$distance_metric))
+    
+    if (nrow(preferred_solutions) > 0) {
+      best_solution <- preferred_solutions[which.max(preferred_solutions$score), "solution"][[1]]
+      # print(paste0("best_solution: ", which.max(preferred_solutions$score)))
+      # print(paste0("best_solution: ", best_solution))
+      # cat(best_solution$color1, best_solution$color2, "\n")
+      
+      # print('findSolution2:')
+      # test_GC_counts(c(best_solution$color1, best_solution$color2))
+
+    } else {
+      # Fallback: use distance_metric == 0
+      fallback_solutions <- subset(solutions_df, distance_metric == 0)
+      best_solution <- fallback_solutions[which.max(fallback_solutions$score), "solution"][[1]]
+    }
+    
+    return(best_solution)
+  } else {
+    # print(paste0("last_non_null_solution: ", last_non_null_solution))
+    return(last_non_null_solution)
+  }
+  
   print("Didn't find a solution in findSolution in global.r")
   stop(paste("No solution found after", nbMaxTrials, "trials using these parameters, you can modify them or increase the number of trials."))
 }
@@ -702,6 +671,7 @@ checkProposedSolution <- function(solution, unicityConstraint, chemistry){
     stop("The solution proposed uses different numbers of samples per lane. Thanks to report this error to Hugo Varet (hugo.varet@pasteur.fr)")
   }
   # indices not compatible in at least one pool/lane
+  # print('Came from checkProposedSolution')
   if (any(!sapply(split(solution, solution$pool), areIndexesCompatible, chemistry))){
     # stop("The solution proposed uses incompatible indices Thanks to report this error to Hugo Varet (hugo.varet@pasteur.fr)")
     return(FALSE)
@@ -728,6 +698,7 @@ checkProposedSolution2 <- function(solution, chemistry){
     stop("The solution proposed uses different numbers of samples per lane. Thanks to report this error to Hugo Varet (hugo.varet@pasteur.fr)")
   }
   # indices not compatible in at least one pool/lane
+  # print('Came from checkProposedSolution2')
   sol1 <- data.frame(id=solution$id1, sequence=solution$sequence1, color=solution$color1, stringsAsFactors = FALSE)
   if (any(!sapply(split(sol1, solution$pool), areIndexesCompatible, chemistry))){
     # stop("The solution proposed uses incompatible indices. Thanks to report this error to Hugo Varet (hugo.varet@pasteur.fr)")
@@ -759,12 +730,13 @@ heatmapindex <- function(solution){
   
   percentage_threshold <- 25
   
+  lengthSequence <- nchar(solution$sequence[1])
   lengthSequence1 <- nchar(solution$sequence1[1])
   lengthSequence2 <- nchar(solution$sequence2[1])
-  # print(paste0('lengthSequence1: ', lengthSequence1))
   
   # print(paste0('solution: ', solution))
-  solution_color_percentages <- calculate_color_percentages_with_weights(solution)
+  solution_color_percentages_list <- calculate_color_percentages_with_weights(solution)
+  solution_color_percentages <- solution_color_percentages_list$solution_color_percentages
   # print(paste0('solution_color_percentages: ', colnames(solution_color_percentages)))
   
   if ("id1" %in% names(solution)){
@@ -783,7 +755,16 @@ heatmapindex <- function(solution){
                                     str_replace("pool", ""))))
   
   num_pools <- length(pools)
-  numberPositions <- lengthSequence1 + lengthSequence2 + 1
+  numberPositions <- 1 + 
+    sum(as.numeric(lengthSequence %||% 0), 
+        as.numeric(lengthSequence1 %||% 0), 
+        as.numeric(lengthSequence2 %||% 0), 
+        na.rm = TRUE)
+  
+  lengthSequence_first_col <- sum(as.numeric(lengthSequence %||% 0), as.numeric(lengthSequence1 %||% 0), na.rm = TRUE)
+  # print(paste0('lengthSequence_first_col: ', lengthSequence_first_col))
+  # print(paste0('numberPositions: ', numberPositions))
+  
   color_percentages.pool <- matrix(" ", nrow = 4 * num_pools, ncol = numberPositions)
   
   for(p in seq_along(pools)) {
@@ -791,7 +772,7 @@ heatmapindex <- function(solution){
     row_indices <- (4*(p-1) + 1):(4*p)
     
     # Process Color1 (positions 1-lengthSequence1)
-    for(pos in 1:lengthSequence1) {
+    for(pos in 1:lengthSequence_first_col) {
       # Get columns for this position and pool
       r_col <- grep(paste0("pool", pool, "_pos", pos, ".*_position",pos,"_R$"), colnames(solution_color_percentages), value = TRUE)
       g_col <- grep(paste0("pool", pool, "_pos", pos, ".*_position",pos,"_G$"), colnames(solution_color_percentages), value = TRUE)
@@ -835,28 +816,28 @@ heatmapindex <- function(solution){
       if(length(r_col) > 1) {
         val <- solution_color_percentages[1, r_col[2]]
         if(!is.na(val) && is.numeric(val)) {
-          color_percentages.pool[row_indices[1], pos + lengthSequence1 + 1] <- paste0(round(val), "%")
+          color_percentages.pool[row_indices[1], pos + lengthSequence_first_col + 1] <- paste0(round(val), "%")
           # numeric_values[row_indices[1], pos + 8] <- val
         }
       }
       if(length(g_col) > 1) {
         val <- solution_color_percentages[1, g_col[2]]
         if(!is.na(val) && is.numeric(val)) {
-          color_percentages.pool[row_indices[2], pos + lengthSequence1 + 1] <- paste0(round(val), "%")
+          color_percentages.pool[row_indices[2], pos + lengthSequence_first_col + 1] <- paste0(round(val), "%")
           # numeric_values[row_indices[2], pos + 8] <- val
         }
       }
       if(length(b_col) > 1) {
         val <- solution_color_percentages[1, b_col[2]]
         if(!is.na(val) && is.numeric(val)) {
-          color_percentages.pool[row_indices[3], pos + lengthSequence1 + 1] <- paste0(round(val), "%")
+          color_percentages.pool[row_indices[3], pos + lengthSequence_first_col + 1] <- paste0(round(val), "%")
           # numeric_values[row_indices[3], pos + 8] <- val
         }
       }
       if(length(dash_col) > 1) {
         val <- solution_color_percentages[1, dash_col[2]]
         if(!is.na(val) && is.numeric(val)) {
-          color_percentages.pool[row_indices[4], pos + lengthSequence1 + 1] <- paste0(round(val), "%")
+          color_percentages.pool[row_indices[4], pos + lengthSequence_first_col + 1] <- paste0(round(val), "%")
           # numeric_values[row_indices[4], pos + 8] <- val
         }
       }
@@ -975,7 +956,10 @@ calculate_color_percentages <- function(solution) {
   }
   
   # Split color1 and color2 into separate columns for each position
-  max_length <- max(nchar(solution$color1), nchar(solution$color2))
+  # print(paste0('nchar(solution$color1): ', nchar(solution$color1)))
+  # print(paste0('nchar(solution$color2): ', nchar(solution$color2)))
+  max_length <- max(nchar(solution$color), nchar(solution$color1), nchar(solution$color2))
+  
   expanded_colors <- solution %>%
     rowwise() %>%
     mutate(
@@ -1057,26 +1041,51 @@ calculate_color_percentages_with_weights <- function(solution) {
   }
   
   # Max length of color sequences
-  # print(paste0('nchar(solution$color1): ', nchar(solution$color1)))
-  # print(paste0('nchar(solution$color2): ', nchar(solution$color2)))
-  max_length <- max(nchar(solution$color1), nchar(solution$color2))
+  # print(paste0('names(solution): ', names(solution)))
+  # print(paste0('solution$color: ', solution$color))
+  max_length <- max(nchar(solution$color), nchar(solution$color1), nchar(solution$color2))
+  # print(paste0('nchar(solution$color): ', max_length))
   
   # Expand color1 and color2 into separate columns for each position
   expanded_colors <- solution %>%
     rowwise() %>%
-    mutate(
-      color1_chars = list(split_and_pad(color1, max_length)),
-      color2_chars = list(split_and_pad(color2, max_length))
-    ) %>%
-    ungroup() %>%
-    select(pool, color1_chars, color2_chars, weight1, weight2) %>%  # Added pool to select
-    unnest_wider(color1_chars, names_sep = "_") %>%
-    unnest_wider(color2_chars, names_sep = "_")
+    {
+      if ("color" %in% names(.)) {
+        # Case for single color and weight
+        mutate(., 
+               color_chars = list(split_and_pad(color, max_length))) %>%
+          ungroup() %>%
+          select(pool, color_chars, weight) %>%
+          unnest_wider(color_chars, names_sep = "_")
+      } else {
+        # Case for color1, color2, weight1, weight2
+        mutate(.,
+               color1_chars = list(split_and_pad(color1, max_length)),
+               color2_chars = list(split_and_pad(color2, max_length))) %>%
+          ungroup() %>%
+          select(pool, color1_chars, color2_chars, weight1, weight2) %>%
+          unnest_wider(color1_chars, names_sep = "_") %>%
+          unnest_wider(color2_chars, names_sep = "_")
+      }
+    }
   
+  # Expand color1 and color2 into separate columns for each position
+  # expanded_colors <- solution %>%
+  #   rowwise() %>%
+  #   mutate(
+  #     color1_chars = list(split_and_pad(color1, max_length)),
+  #     color2_chars = list(split_and_pad(color2, max_length))
+  #   ) %>%
+  #   ungroup() %>%
+  #   select(pool, color1_chars, color2_chars, weight1, weight2) %>%  # Added pool to select
+  #   unnest_wider(color1_chars, names_sep = "_") %>%
+  #   unnest_wider(color2_chars, names_sep = "_")
   
   # Function to calculate weighted adjusted percentages for each position
   calculate_adjusted_percentages <- function(df, col_prefix, weight_col, max_length) {
     result_list <- list()
+    result_list_R_G <- list()
+    result_list_G_B <- list()
     
     # Process each pool separately
     pools <- unique(df$pool)
@@ -1122,28 +1131,100 @@ calculate_color_percentages_with_weights <- function(solution) {
         position_percentages <- position_percentages %>%
           select(-C, -O)
         
+        # Set up position percentages for R and G only
+        position_percentages_R_G <- position_percentages %>%
+          select(R, G)
+        
+        # Set up position percentages for G and B only
+        position_percentages_G_B <- position_percentages %>%
+          select(G, B)
+        
         # Add pool and position indicator to column names
         position_colnames <- paste0(col_prefix, "_pool", current_pool, "_position", i, "_", colnames(position_percentages))
         colnames(position_percentages) <- position_colnames
         
+        # print(paste0('position_colnames: ', position_colnames))
+        # print(paste0('position_percentages: ', position_percentages))
+        
         # Store results
         result_key <- paste0("pool", current_pool, "_pos", i)
         result_list[[result_key]] <- position_percentages
+        
+        # Add pool and position indicator to column names for R/G chemistrys
+        position_colnames_R_G <- paste0(col_prefix, "_pool", current_pool, "_position", i, "_", colnames(position_percentages_R_G))
+        colnames(position_percentages_R_G) <- position_colnames_R_G
+        
+        # print(paste0('position_colnames_R_G: ', position_colnames_R_G))
+        # print(paste0('position_percentages_R_G: ', position_percentages_R_G))
+        
+        # Store results
+        result_key_R_G <- paste0("pool", current_pool, "_pos", i)
+        result_list_R_G[[result_key_R_G]] <- position_percentages_R_G
+        
+        # Add pool and position indicator to column names for G/B chemistrys
+        position_colnames_G_B <- paste0(col_prefix, "_pool", current_pool, "_position", i, "_", colnames(position_percentages_G_B))
+        colnames(position_percentages_G_B) <- position_colnames_G_B
+        
+        # print(paste0('position_colnames_G_B: ', position_colnames_G_B))
+        # print(paste0('position_percentages_G_B: ', position_percentages_G_B))
+        
+        # Store results
+        result_key_G_B <- paste0("pool", current_pool, "_pos", i)
+        result_list_G_B[[result_key_G_B]] <- position_percentages_G_B
       }
     }
+
+    result_all <- do.call(cbind, result_list)
+    # result_rg <- do.call(cbind, result_list_R_G)
+    # result_gb <- do.call(cbind, result_list_G_B)
+    result_vector_rg <- unlist(result_list_R_G)
+    result_vector_gb <- unlist(result_list_G_B)
     
-    return(do.call(cbind, result_list))
+    # print(paste0('result_list_G_B: ', result_list_G_B))  
+    # cat(result_vector_gb, "\n")
+    
+    return(list(result_all = result_all, result_vector_rg = result_vector_rg, result_vector_gb = result_vector_gb))
+    
+    # return(do.call(cbind, result_list))
   }
   
   # Calculate percentages for color1 and color2 using dynamic weight columns
-  color1_percentages <- calculate_adjusted_percentages(expanded_colors, "color1_chars", "weight1", max_length)
-  color2_percentages <- calculate_adjusted_percentages(expanded_colors, "color2_chars", "weight2", max_length)
+  # print(paste0('names(solution): ', names(solution)))
+  if ("color" %in% names(solution)) {
+    adjusted_percentages <- calculate_adjusted_percentages(expanded_colors, "color_chars", "weight", max_length)
+    color_percentages <- adjusted_percentages$result_all
+    color_percentages_vector_rg <- adjusted_percentages$result_vector_rg
+    color_percentages_vector_gb <- adjusted_percentages$result_vector_gb
+
+    # Combine all percentages into a single dataframe
+    solution_color_percentages <- color_percentages
+    solution_color_percentages_vector_rg <- color_percentages_vector_rg
+    solution_color_percentages_vector_gb <- color_percentages_vector_gb
+    
+    # print_color_percentages(solution_color_percentages)
+  } else {
+    adjusted_percentages <- calculate_adjusted_percentages(expanded_colors, "color1_chars", "weight1", max_length)
+    color1_percentages <- adjusted_percentages$result_all
+    color1_percentages_vector_rg <- adjusted_percentages$result_vector_rg
+    color1_percentages_vector_gb <- adjusted_percentages$result_vector_gb
+    adjusted_percentages <- calculate_adjusted_percentages(expanded_colors, "color2_chars", "weight2", max_length)
+    color2_percentages <- adjusted_percentages$result_all
+    color2_percentages_vector_rg <- adjusted_percentages$result_vector_rg
+    color2_percentages_vector_gb <- adjusted_percentages$result_vector_gb
+
+    # print(paste0('color1_percentages: ', color1_percentages))
+
+    # Combine all percentages into a single dataframe
+    solution_color_percentages <- bind_cols(color1_percentages, color2_percentages)
+    solution_color_percentages_vector_rg <- c(color1_percentages_vector_rg, color2_percentages_vector_rg)
+    solution_color_percentages_vector_gb <- c(color1_percentages_vector_gb, color2_percentages_vector_gb)
   
-  # Combine all percentages into a single dataframe
-  solution_color_percentages <- bind_cols(color1_percentages, color2_percentages)
-  print_color_percentages(solution_color_percentages)
+    # print_color_percentages(solution_color_percentages)
+    # cat(solution_color_percentages_vector_gb, "\n")
+  }
   
-  return(solution_color_percentages)
+  # print(paste0('solution_color_percentages: ', solution_color_percentages))
+  return(list(solution_color_percentages = solution_color_percentages, vector_rg = solution_color_percentages_vector_rg, vector_gb = solution_color_percentages_vector_gb))
 }
 
 # Format and print the results
@@ -1202,93 +1283,6 @@ print_color_percentages <- function(solution_color_percentages) {
       }
     }
   }
-}
-
-# Function to calculate the percentage of each character in each position of color1 and color2
-calculate_color_percentages_with_weights_before_split_by_pool <- function(solution) {
-  possible_characters <- c("R", "G", "B", "-", "C", "O")
-  
-  # Helper function to split characters and pad with NA if lengths are unequal
-  split_and_pad <- function(color_str, max_length) {
-    chars <- unlist(strsplit(color_str, ""))
-    if (length(chars) < max_length) {
-      chars <- c(chars, rep(NA, max_length - length(chars)))
-    }
-    return(chars)
-  }
-  
-  # Max length of color sequences
-  max_length <- max(nchar(solution$color1), nchar(solution$color2))
-  
-  # Expand color1 and color2 into separate columns for each position
-  expanded_colors <- solution %>%
-    rowwise() %>%
-    mutate(
-      color1_chars = list(split_and_pad(color1, max_length)),
-      color2_chars = list(split_and_pad(color2, max_length))
-    ) %>%
-    ungroup() %>%
-    select(color1_chars, color2_chars, weight1, weight2) %>%
-    unnest_wider(color1_chars, names_sep = "_") %>%
-    unnest_wider(color2_chars, names_sep = "_")
-  
-  # Function to calculate weighted adjusted percentages for each position
-  calculate_adjusted_percentages <- function(df, col_prefix, weight_col, max_length) {
-    result_list <- list()
-    for (i in 1:max_length) {
-      col_name <- paste0(col_prefix, "_", i)
-      
-      # Calculate weighted count for each character
-      position_percentages <- df %>%
-        count(!!sym(col_name), wt = !!sym(weight_col)) %>%
-        filter(!is.na(!!sym(col_name))) %>%
-        mutate(percentage = n / sum(n) * 100) %>%
-        select(-n) %>%
-        pivot_wider(names_from = !!sym(col_name), values_from = percentage, values_fill = list(percentage = 0))
-      
-      # Ensure all possible characters are present
-      for (character in possible_characters) {
-        if (!(character %in% colnames(position_percentages))) {
-          position_percentages[[character]] <- 0
-        }
-      }
-      
-      # Adjust based on presence of 'C' and 'O'
-      if ("C" %in% colnames(position_percentages)) {
-        position_percentages <- position_percentages %>%
-          mutate(
-            B = B + C,
-            G = G + C
-          )
-      }
-      if ("O" %in% colnames(position_percentages)) {
-        position_percentages <- position_percentages %>%
-          mutate(
-            R = R + O,
-            G = G + O
-          )
-      }
-      
-      # Remove C and O from the results
-      position_percentages <- position_percentages %>%
-        select(-C, -O)
-      
-      # Add position indicator to column names
-      position_colnames <- paste0(col_prefix, "_position", i, "_", colnames(position_percentages))
-      colnames(position_percentages) <- position_colnames
-      result_list[[i]] <- position_percentages
-    }
-    return(do.call(cbind, result_list))
-  }
-  
-  # Calculate percentages for color1 and color2 using dynamic weight columns
-  color1_percentages <- calculate_adjusted_percentages(expanded_colors, "color1_chars", "weight1", max_length)
-  color2_percentages <- calculate_adjusted_percentages(expanded_colors, "color2_chars", "weight2", max_length)
-  
-  # Combine all percentages into a single dataframe
-  solution_color_percentages <- bind_cols(color1_percentages, color2_percentages)
-  
-  return(solution_color_percentages)
 }
 
 # Function to convert percentages into the specified format for output
