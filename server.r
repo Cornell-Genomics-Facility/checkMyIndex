@@ -13,6 +13,9 @@ shinyServer(function(input, output, session) {
     rv$inputFile <- NULL
     rv$inputFile2 <- NULL
     rv$testdata <- "none"
+    
+    initialSelected(data.frame(id = character(0), stringsAsFactors = FALSE))   # drop all pre-/user-selected rows
+    DT::selectRows(DT::dataTableProxy("inputIndex"), NULL)                     # clear the blue
   })
   # automatically go to the first tab when pressing "reset" or providing any input file
   observeEvent(c(input$inputFile, input$inputFile2, input$testdata, input$reset), ignoreInit=TRUE, {
@@ -53,6 +56,11 @@ shinyServer(function(input, output, session) {
     updateTabsetPanel(session, "mainPanel", selected = "proposedSolution")
   })
   
+  ## a mutable holder for the pre-selected rows
+  initialSelected <- reactiveVal(
+    data.frame(id = character(0), stringsAsFactors = FALSE)
+  )
+  
   # list of input index 1
   inputIndexes <- reactive({
     # print('Input index 1 entered')
@@ -64,8 +72,40 @@ shinyServer(function(input, output, session) {
       if (!is.null(fileInput())) file <- fileInput()$datapath else return(NULL)
     }
     # print(paste0('file: ', file))
-    result <- tryCatch({readIndexesFileWithWeights(file)}, 
-                      error = function(e) stop("An error occured when loading index 1 file, please check its structure."))
+    
+    result <- tryCatch(
+      readIndexesFileWithWeights(file),
+      
+      error = function(e) {
+        
+        msg <- conditionMessage(e)      # the message from readIndexesFileWithWeights()
+        
+        if (grepl("cannot open the connection", msg, fixed = TRUE)) {
+          ## file path wrong / permission denied
+          stop("Index file could not be opened (check the path and permissions):\n", msg)
+          
+        } else {
+          ## fallback: rethrow with extra context
+          stop("Unexpected error while loading index file:\n", msg)
+        }
+      }
+    )
+    
+    ## Get rows where selected == 1 ----------------------------
+    if ("selected" %in% names(result$index)) {
+      sel <- result$index[result$index$selected == 1, "id", drop = FALSE]   # 1-column df
+      if (nrow(sel)) initialSelected(sel)
+      # initialSelected(result$index[result$index$selected == 1, , drop = FALSE])
+    }
+    
+    result$index  <- result$index [ , !(names(result$index)  == "selected"), drop = FALSE]
+    if (!is.null(result$index2) && "selected" %in% names(result$index2)) {
+      result$index2 <- result$index2[ , !(names(result$index2) == "selected"), drop = FALSE]
+    }
+    
+    # result <- tryCatch({readIndexesFileWithWeights(file)}, 
+    #                   error = function(e) stop("An error occured when loading index 1 file, please check its structure."))
+    
     # index <- tryCatch({readIndexesFileWithWeights(file)$index}, 
     #                   error = function(e) stop("An error occured when loading index 1 file, please check its structure."))
     # index <- addColors(index, input$chemistry)
@@ -110,7 +150,132 @@ shinyServer(function(input, output, session) {
   
   output$indexUploaded <- reactive({!is.null(inputIndex())})
   outputOptions(output, "indexUploaded", suspendWhenHidden=FALSE)
-  output$inputIndex <- DT::renderDT({inputIndex()}, options=list(paging=FALSE, searching=FALSE, info=FALSE))
+  
+  # --------------------------------------------------------------------
+  # 1) Show the table with multi-row selection enabled
+  # 2) Make the selected rows easy to use elsewhere
+  # --------------------------------------------------------------------
+  output$inputIndex <- DT::renderDT({
+    
+    ## ── 1.  get the data you want to show --------------------------------
+    df <- req(inputIndexes()$index)          # already has NO “selected” column
+    
+    ## ── 2.  find which rows were pre-selected in the file -----------------
+    pre_rows <- which(df$id %in% isolate(initialSelected()$id))  # 1-based
+    
+    ## ── 3.  build the widget with those rows pre-highlighted -------------
+    DT::datatable(
+      df,
+      rownames  = FALSE,
+      options   = list(
+        paging    = FALSE,
+        searching = FALSE,
+        info      = FALSE
+      ),
+      selection = list(
+        mode     = "multiple",
+        target   = "row",
+        selected = pre_rows                # <- <-- HERE: blue rows on load
+      )
+    )
+  })
+  
+  # Old code
+  # output$inputIndex <- DT::renderDT({inputIndex()}, options=list(paging=FALSE, searching=FALSE, info=FALSE))
+  
+  # Any downstream code can use selectedRows() to see what was chosen
+  # selectedRows <- reactive({
+  #   req(input$inputIndex_rows_selected)             # wait until at least one row is clicked
+  #    inputIndex()[ input$inputIndex_rows_selected , ]
+  # })
+  
+  # selectedRows <- reactive({
+  #   rows <- input$inputIndex_rows_selected        # integer vector or integer(0)
+  #   
+  #   if (length(rows) == 0) {
+  #     # keep the same columns but zero rows
+  #     inputIndex()[0, , drop = FALSE]
+  #   } else {
+  #     inputIndex()[rows, , drop = FALSE]
+  #   }
+  # })
+
+  observeEvent(input$inputIndex_rows_selected, 
+               ignoreNULL = FALSE,          # ← fire when selection becomes empty
+  {
+    
+    df  <- req(inputIndexes()$index)                 # full table
+    ids <- df$id[input$inputIndex_rows_selected]     # may be character(0)
+    
+    # overwrite the reactiveVal with the *current* set of IDs
+    initialSelected(data.frame(id = ids, stringsAsFactors = FALSE))
+  })
+  
+  selectedRows <- reactive({
+    initialSelected()          # already a 1-column data-frame (id)
+  })
+  
+  # selectedRows <- reactive({
+  #   ## rows clicked in the table
+  #   rows_clicked <- input$inputIndex_rows_selected
+  #   src_table    <- inputIndexes()$index
+  #   
+  #   clicked <- if (length(rows_clicked)) {
+  #     src_table[rows_clicked , "id", drop = FALSE]   # 1-col df
+  #   } else {
+  #     src_table[0 , "id", drop = FALSE]              # empty df with id col
+  #   }
+  #   
+  #   ## union of pre-selected + clicked (remove duplicates by id)
+  #   print(paste0('initialSelected(): ', initialSelected()))
+  #   print(paste0('clicked: ', clicked))
+  #   out <- rbind(initialSelected(), clicked)
+  #   out <- out[!duplicated(out$id), , drop = FALSE]
+  #   out
+  # })
+  
+  # Example: print the chosen rows to the console
+  observeEvent(selectedRows(), {
+    cat("--- rows the user clicked ---\n")
+    print(selectedRows())
+  })
+  
+  # observeEvent(
+  #  {
+  #    selectedRows()          # the click
+  #     rv$requiredIndices      # the loaded table
+  #   },
+  #   ignoreNULL = FALSE,
+  #   {
+  #     
+  #   print("observer fired")
+  #   print(selectedRows())
+  #   
+  #   ## 0.  Make sure the table has been loaded
+  #   req(rv$requiredIndices)
+  #   
+  #   if (!is.data.frame(rv$requiredIndices)) {
+  #      stop("rv$requiredIndices should be a data-frame; got class: ",
+  #           paste(class(rv$requiredIndices), collapse = ", "))
+  #   }
+  #   
+  #   sel <- input$inputIndex_rows_selected          # integer vector (may be integer(0))
+  #   print(str(rv$requiredIndices))
+  #   print(sel)
+  #   
+  #   ## 1.  Update the “Selected” flag shown in the table
+  #   rv$requiredIndices$Selected <- FALSE
+  #   if (length(sel)) rv$requiredIndices$Selected[sel] <- TRUE
+  #   
+  #   ## 2.  Keep selectedRows as a *data-frame* at all times
+  #   rv$selectedRows <-
+  #     if (length(sel)) {
+  #       rv$requiredIndices[sel, , drop = FALSE]     # rows user clicked
+  #     } else {
+  #       rv$requiredIndices[0, , drop = FALSE]       # same columns, zero rows
+  #     }
+  # })
+  
   output$textIndex <- renderText({tryCatch({
     index <- inputIndex()
     if (is.null(index)){
@@ -259,22 +424,24 @@ shinyServer(function(input, output, session) {
     # print(paste0('index[, -5]: ', index[, -5]))
     # print(paste0('input$multiplexingRate: ', input$multiplexingRate))
     
-    return(generateListOfIndexesCombinations(index = index[, -5],
+    return(generateListOfIndexesCombinations(index = index[, -6],
                                              nbSamplesPerLane = as.numeric(input$multiplexingRate),
                                              completeLane = input$completeLane,
                                              selectCompIndexes = input$selectCompIndexes,
-                                             chemistry = input$chemistry))
+                                             chemistry = input$chemistry,
+                                             selectedRows = selectedRows()))
   })
   generateList2 <- reactive({
     index2 <- inputIndex2()
     if (is.null(index2)){
       return(NULL)
     } else{
-      return(generateListOfIndexesCombinations(index = index2[, -5],
+      return(generateListOfIndexesCombinations(index = index2[, -6],
                                                nbSamplesPerLane = as.numeric(input$multiplexingRate),
                                                completeLane = input$completeLane,
                                                selectCompIndexes = input$selectCompIndexes,
-                                               chemistry = input$chemistry))
+                                               chemistry = input$chemistry,
+                                               selectedRows = selectedRows()))
     }
   })
   generateListPairedIndexes <- reactive({
@@ -291,12 +458,13 @@ shinyServer(function(input, output, session) {
         }
       }
       names(index2) <- paste0(names(index2), "2")
-      index <- cbind(index[, -5], index2[, -5])
+      index <- cbind(index[, -6], index2[, -6])
       return(generateListOfIndexesCombinations(index = index,
                                                nbSamplesPerLane = as.numeric(input$multiplexingRate),
                                                completeLane = input$completeLane,
                                                selectCompIndexes = input$selectCompIndexes,
-                                               chemistry = input$chemistry))
+                                               chemistry = input$chemistry,
+                                               selectedRows = selectedRows()))
     }
   })
   
@@ -337,8 +505,8 @@ shinyServer(function(input, output, session) {
       return(NULL)
     } else{
       withProgress({
-        index <- inputIndex()[, -5]
-        index2 <- inputIndex2()[, -5]
+        index <- inputIndex()[, -6]
+        index2 <- inputIndex2()[, -6]
         if (is.null(index2)){
           indexesList <- generateList()
           indexesList2 <- NULL
@@ -376,7 +544,7 @@ shinyServer(function(input, output, session) {
                                  selectCompIndexes = input$selectCompIndexes,
                                  chemistry = input$chemistry,
                                  i7i5pairing = input$i7i5pairing)
-        
+
         # Calculate the percentage of each character in each position of color1 and color2
         results <- calculate_color_percentages_with_weights(solution)
         solution_color_percentages_with_weights <- results$solution_color_percentages
@@ -443,9 +611,51 @@ shinyServer(function(input, output, session) {
     }
   })
   
+  # Modify original renderDT to highlight selected rows (all rows whose id is in selectedRows() now show bold, deep-pink text)
+  # output$solution <- DT::renderDT({
+  #   tryCatch({displaySolution()$solution}, error = function(e) NULL)
+  # }, options=list(paging=FALSE, searching=FALSE, info=FALSE))
   output$solution <- DT::renderDT({
-    tryCatch({displaySolution()$solution}, error = function(e) NULL)
-  }, options=list(paging=FALSE, searching=FALSE, info=FALSE))
+    
+    df <- tryCatch(displaySolution()$solution, error = function(e) NULL)
+    req(df)
+
+    ## Which column holds the barcode ID?  ("id" OR "id1")
+    id_col <- if ("id"  %in% names(df))      "id"
+    else if ("id1" %in% names(df)) "id1"
+    else                           NULL           # no ID column found
+
+    ## Vector of IDs that must be highlighted ---------------------------
+    hilite <- if (!is.null(id_col) && !is.null(selectedRows()))
+      hilite <- selectedRows()$id
+    else character(0)
+    # print(paste0('hilite: ', hilite))
+    
+    ## Build the table ------------------------------------------------
+    DT::datatable(
+      df,
+      rownames = FALSE,
+      options  = list(
+        paging    = FALSE,
+        searching = FALSE,
+        info      = FALSE
+      )
+    ) %>%
+      ## Colour EVERY column in the matching rows --------------------
+    {                                   # apply styling only if id_col exists
+      if (!is.null(id_col) && length(hilite)) {
+        DT::formatStyle(
+          .,
+          columns        = names(df),                 # colour the whole row
+          valueColumns   = id_col,                    # "id" or "id1"
+          # backgroundColor = DT::styleEqual(hilite, "#f0f0f0"), # grey fill
+          color           = DT::styleEqual(hilite, "deeppink"), # dark-pink text
+          fontWeight      = DT::styleEqual(hilite, "bold"),    # bold faces
+          target          = "row"
+        )
+      } else .
+    }
+  })
   
   # text describing the color balancing
    output$textDescribingColorBalancing <- renderText({
@@ -510,7 +720,17 @@ shinyServer(function(input, output, session) {
   })
   
   # plot of the solution
-  output$heatmapindex <- renderPlot({heatmapindex(displaySolution()$solution)}, res=90)
+  output$heatmapindex <- renderPlot({
+    req(selectedRows())                    # wait until at least one row selected
+    req(displaySolution())                 # make sure the solution is ready
+    
+    heatmapindex(
+      displaySolution()$solution,
+      selectedRows = selectedRows()        # ← evaluated *here*, inside reactivity
+    )
+  }, res = 90)
+  
+  # output$heatmapindex <- renderPlot({heatmapindex(displaySolution()$solution)}, res=90)
   output$heatmapindex2 <- renderUI({
     if (!is.null(tryCatch({displaySolution()$solution}, error = function(e) NULL))){
       plotOutput("heatmapindex", width=900, height=220+20*as.numeric(input$nbSamples))

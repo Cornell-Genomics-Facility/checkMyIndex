@@ -5,16 +5,26 @@ Search for a set of compatible indices for your sequencing experiment according 
 * the number of samples
 * the desired multiplexing rate (i.e. number of samples per pool/lane)
 * the constraint on the indices (none, use each one or each combination only once)
+* the inclusion of any indices that are require to appear in the solution
 
 ## Modifications in this fork (made by Cornell Genomics Facility)
 
 * Added XLEAP-SBS chemistry (used by the Illumina NovaSeq X Series and NextSeq 1000/2000)
 * Added color balancing tab to show the respective percentages for each of the red, green, and blue colors at each position
 * Added ability to rank solutions and return the best one from a given number of trials
+* Modifications to enable selection of required indices (within a larger set of indices) and find the best solution that includes those required indices
 
 ## Input index file(s)
 
-The list of the available indices must be stored either as a four-column tab-delimited text file without header or as two-column tab-delimited text file(s) without header. In the case of the four-column file, the i7 / i5 index ids are in the first column, the i7 sequences are in the second column, the i5 sequences are in the third column, and the weights are in the fourth column. In the case of the two-column file(s), index ids are in the first column and corresponding sequences in the second. Examples of both a four column (for use a Unique Dual-Indexing (UDI) context) and a two-column file are available in this repository (testCheckMyIndex-i7-i5.txt and inputIndexesExample.txt respectively) to test the application. 
+The list of available indices are supplied in one, or two, tab delimited text files without headers. This app requires each row in the file(s) to consist of an ID, a single sequence (in the case of a single index file), or two sequences (in the case of a dual index file), a weight, and a flag indicating whether the index is required to be in the final solution (1 = required; 0 = not required). If the weight is not supplied it will default to "1"; if the required indicator is not supplied it will default to "0". Possible file formats and column contents are given below:
+* Two column, single index file, where each row has the format: <ID> <Sequence>
+* Three column, single index file, where each row has the format: <ID> <Sequence> <Weight>
+* Four column, single index file, where each row has the format: <ID> <Sequence> <Weight> <Required indicator>
+* Three column, dual index file, where each row has the format: <ID> <Sequence> <Sequence>
+* Four column, dual index file, where each row has the format: <ID> <Sequence> <Sequence> <Weight>
+* Five column, dual index file, where each row has the format: <ID> <Sequence> <Sequence> <Weight> <Required indicator>
+
+Any other formats or column orders are not valid and will cause the app to error out or generate incorrect results. Examples of both a four column (for use a Unique Dual-Indexing (UDI) context) and a two-column, single index, file are available in this repository (testCheckMyIndex-i7-i5.txt and inputIndexesExample.txt respectively) to test the application. 
 
 ## Shiny application
 
@@ -83,6 +93,7 @@ Illumina has developed four types of chemistry: the four-channel for the HiSeq a
 * Genomics Facility at Cornell version 1.2.2: Bug fix in check for index compatibility when using multiple pools
 * Genomics Facility at Cornell version 1.2.3: Bug fix in server code to use renderDT
 * Genomics Facility at Cornell version 1.3.0: Modifications to find the best solution from a given number of trials
+* Genomics Facility at Cornell version 1.4.0: Modifications to enable selection of required indices and find best solution that includes those indices
 
 ## About checkMyIndex
 
