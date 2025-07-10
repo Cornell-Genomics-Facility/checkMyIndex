@@ -5,7 +5,7 @@ Search for a set of compatible indices for your sequencing experiment according 
 * the number of samples
 * the desired multiplexing rate (i.e. number of samples per pool/lane)
 * the constraint on the indices (none, use each one or each combination only once)
-* the inclusion of any indices that are require to appear in the solution
+* the inclusion of any indices that are required to appear in the solution
 
 ## Modifications in this fork (made by Cornell Genomics Facility)
 
