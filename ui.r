@@ -118,17 +118,28 @@ shinyUI(fluidPage(theme = "bootstrap.min.css", shinyjs::useShinyjs(),
                                  h3("What checkMyIndex does"),
                                  p("Searches for a set of compatible indices for your sequencing experiment according to the number of samples and the desired multiplexing rate (i.e. number 
                                    of samples per pool/lane). The app returns the best, color balanced solution it can find (assuming one exists) from the number of trials you select (note: 
-                                   better solutions may be found by running for more trials, but this takes longer to run)."),
+                                   better solutions may be found by running for more trials, but this takes longer to run). The app will also allow the selection of required indices (within 
+                                   a larger set of indices) and find best the solution that includes those required indices."),
 
                                  h3("Input index file(s)"),
-                                 p("The user must provide the available indices either as a four-column tab-delimited text file without header or as two-column tab-delimited text file(s) 
-                                   without header. In the case of the four-column file, the i7 / i5 index ids are in the first column, the i7 sequences are in the second column, the i5 
-                                   sequences are in the third column, and the weights are in the fourth column. In the case of the two-column file(s), index ids are in the first column and 
-                                   corresponding sequences in the second. Examples of both a four-column and a two-column file are available in the GitHub repository ", 
+                                 p("The list of available indices are supplied in one, or two, tab delimited text files without headers. This app requires each row in the file(s) to consist of 
+                                   an ID, a single sequence (in the case of a single index file), or two sequences (in the case of a dual index file), a weight, and a flag indicating whether 
+                                   the index is required to be in the final solution (1 = required; 0 = not required). If the weight is not supplied it will default to '1'; if the required 
+                                   indicator is not supplied it will default to '0'. Possible file formats and column contents are given below:"),
+                                 tags$ul(
+                                   tags$li("Two column, single index file, where each row has the format: <ID> <Sequence>"),
+                                   tags$li("Three column, single index file, where each row has the format: <ID> <Sequence> <Weight>"),
+                                   tags$li("Four column, single index file, where each row has the format: <ID> <Sequence> <Weight> <Required indicator>"),
+                                   tags$li("Three column, dual index file, where each row has the format: <ID> <Sequence> <Sequence>"),
+                                   tags$li("Four column, dual index file, where each row has the format: <ID> <Sequence> <Sequence> <Weight>"),
+                                   tags$li("Five column, dual index file, where each row has the format: <ID> <Sequence> <Sequence> <Weight> <Required indicator>")
+                                 ),
+                                 p("Any other formats or column orders are not valid and will cause the app to error out or generate incorrect results. 
+                                   Examples of both a four-column and a two-column file are available in the GitHub repository ", 
                                    a("here", href="https://github.com/Cornell-Genomics-Facility/checkMyIndex/blob/master/www/testCheckMyIndex-i7-i5.txt", target="blank", download="testCheckMyIndex-i7-i5.txt"), 
                                    "and ", a("here", href="https://github.com/Cornell-Genomics-Facility/checkMyIndex/blob/master/www/inputIndexesExample.txt", target="blank", download="inputIndexesExample.txt"), 
                                    "to test the application."),
-
+                                 
                                  h3("Parameters"),
                                  p(strong("Total number of samples"), "in your experiment (can be greater than the number of available indices)."),
                                  p(strong("Multiplexing rate"), "i.e. number of samples per pool/lane (only divisors of the total number of samples are proposed)."),

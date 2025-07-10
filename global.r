@@ -3,9 +3,11 @@ library(parallel)
 library(dplyr)
 library(tidyr)
 library(stringr)
+# library(plotrix)            # boxedtext()
+
 
 checkMyIndexVersion <- "1.0.2"
-cornellCheckMyIndexVersion <- "1.3.0"
+cornellCheckMyIndexVersion <- "1.4.0"
 
 readIndexesFile <- function(file){
   index <- tryCatch({read.table(file, header=FALSE, sep="\t", stringsAsFactors=FALSE, col.names=c("id","sequence"))},
@@ -19,31 +21,145 @@ readIndexesFile <- function(file){
 # If there are four columns, it creates two data frames: index with columns 1, 2, and 4, and index2 with columns 1, 3, and 4.
 # Returns both data frames if applicable and checks both using checkInputIndexes.
 readIndexesFileWithWeights <- function(file) {
+
+  ## ───────────────────────────────────────────────────────────────────
+  ## helper — stop if one or more columns are empty
+  ## ───────────────────────────────────────────────────────────────────
+  check_empty_columns <- function(df, context = "input file") {
+    empty_cols <- which(vapply(df, function(col)
+      length(col) == 0 || all(is.na(col)) || all(trimws(col) == ""),
+      logical(1)
+    ))
+    if (length(empty_cols)) {
+      stop(
+        sprintf(
+          "%s error: column(s) %s are empty. Each column must contain at least one non-empty value.",
+          context,
+          paste(empty_cols, collapse = ", ")
+        ),
+        call. = FALSE
+      )
+    }
+  }
+  
   out <- tryCatch({
     # Read the first row to determine the number of columns
     sample_data <- read.table(file, header=FALSE, sep="\t", nrows=1, stringsAsFactors=FALSE)
     num_cols <- ncol(sample_data)
+    # print(paste0('sample_data: ', sample_data))
+    
+    ## helper: TRUE only when every entry is a non-empty string of A/C/G/T
+    is_valid_barcode <- function(x) {
+      all(grepl("^[ACGT]+$", x))    # at least one char + only those four letters
+    }
     
     if (num_cols == 2) {
-      # Read the file with two columns and add a default weight column
-      index <- read.table(file, header=FALSE, sep="\t", stringsAsFactors=FALSE, col.names=c("id", "sequence"))
+      
+      index <- read.table(file, header = FALSE, sep = "\t", stringsAsFactors = FALSE,
+                          col.names = c("id", "sequence"))
+      check_empty_columns(index, "Two-column index file")
+      
+      if (!is_valid_barcode(index$sequence)) {
+        stop("Two-column index file error: column 2 must contain non-empty barcode ",
+             "sequences composed only of the letters A, C, G and T.")
+      }
+      
       index$weight <- 1
-      list(index=index, index2=NULL)
+      index$selected <- 0
+      colnames(index) <- c("id", "sequence", "weight", "selected")
+      list(index = index, index2 = NULL)
+      
+    } else if (num_cols == 3) {
+      
+      full_data <- read.table(file, header = FALSE, sep = "\t", stringsAsFactors = FALSE)
+      check_empty_columns(full_data, "Three-column index file")
+      
+      ## columns 2 and 3 are the barcode sequences
+      if (is_valid_barcode(full_data[[2]]) && is_valid_barcode(full_data[[3]])) {
+        
+        index  <- full_data[, c(1, 2)]
+        
+        index2 <- full_data[, c(1, 3)]
+        
+        index$weight <- 1
+        index2$weight <- 1
+        index$selected <- 0
+        index2$selected <- 0
+        colnames(index) <- c("id", "sequence", "weight", "selected")
+        colnames(index2) <- c("id", "sequence", "weight", "selected")
+        
+        list(index = index, index2 = index2)
+        
+      } else if (is_valid_barcode(full_data[[2]])) {
+        index  <- full_data[, c(1, 2, 3)]
+        index$selected <- 0
+        colnames(index) <- c("id", "sequence", "weight", "selected")
+        list(index = index, index2 = NULL)
+        
+      } else {
+        stop("Three-column index file error: columns 2 *and* 3 must each contain ",
+             "non-empty barcode sequences composed only of A, C, G and T, or column 2 ",
+             "must contain a non-empty barcode sequence and column 3 must contain a weight.")
+      }
+      
     } else if (num_cols == 4) {
-      # Read the file and create two separate data frames for index and index2
-      full_data <- read.table(file, header=FALSE, sep="\t", stringsAsFactors=FALSE)
-      index <- full_data[, c(1, 2, 4)]
-      colnames(index) <- c("id", "sequence", "weight")
       
-      index2 <- full_data[, c(1, 3, 4)]
-      colnames(index2) <- c("id", "sequence", "weight")
+      full_data <- read.table(file, header = FALSE, sep = "\t", stringsAsFactors = FALSE)
+      check_empty_columns(full_data, "Four-column index file")
       
-      list(index=index, index2=index2)
+      ## columns 2 and 3 are the barcode sequences
+      if (is_valid_barcode(full_data[[2]]) && is_valid_barcode(full_data[[3]])) {
+        
+        index  <- full_data[, c(1, 2, 4)]
+        index2 <- full_data[, c(1, 3, 4)]
+        
+        index$selected <- 0
+        index2$selected <- 0
+        colnames(index) <- c("id", "sequence", "weight", "selected")
+        colnames(index2) <- c("id", "sequence", "weight", "selected")
+        
+        list(index = index, index2 = index2)
+        
+      } else if (is_valid_barcode(full_data[[2]])) {
+        index  <- full_data[, c(1, 2, 3, 4)]
+        colnames(index) <- c("id", "sequence", "weight", "selected")
+        
+        list(index = index, index2 = NULL)
+        
+      } else {
+        stop("Four-column index file error: columns 2 *and* 3 must each contain ",
+             "non-empty barcode sequences composed only of A, C, G and T, or column ",
+             "must contain a non-empty barcode sequence and columns 3 and 4 must ",
+             "contain a weight and a selected indicator.")
+      }
+      
+    } else if (num_cols == 5) {
+    
+      full_data <- read.table(file, header = FALSE, sep = "\t", stringsAsFactors = FALSE)
+      check_empty_columns(full_data, "Five-column index file")
+      
+      ## columns 2 and 3 are the barcode sequences
+      if (!is_valid_barcode(full_data[[2]]) || !is_valid_barcode(full_data[[3]])) {
+        stop("Five-column index file error: columns 2 *and* 3 must each contain ",
+             "non-empty barcode sequences composed only of A, C, G and T.")
+      }
+      
+      index  <- full_data[, c(1, 2, 4, 5)]
+      colnames(index) <- c("id", "sequence", "weight", "selected")
+      
+      index2 <- full_data[, c(1, 3, 4, 5)]
+      colnames(index2) <- c("id", "sequence", "weight", "selected")
+      
+      list(index = index, index2 = index2)
+    
     } else {
-      stop("The input file must contain either two or four columns.")
+      
+      stop("The input file must contain either two, three, four, or five tab-separated columns.")
     }
   },
-  error = function(e) stop("An error occurred when loading the input file, please check its structure."))
+  error = function(e) {
+    stop(conditionMessage(e))
+  })
   
   # Assuming checkInputIndexes is applicable to both indices
   if (!is.null(out$index)) {
@@ -184,9 +300,14 @@ areIndexesCompatible <- function(index, chemistry, column="color"){
   }
 }
 
-generateListOfIndexesCombinations <- function(index, nbSamplesPerLane, completeLane, selectCompIndexes, chemistry){
+generateListOfIndexesCombinations <- function(index, nbSamplesPerLane, completeLane, selectCompIndexes, chemistry, selectedRows){
   # remove indices starting with GG if two-channel chemistry
   if (chemistry == "2") index <- index[!sapply(index$sequence, substr, 1, 2) == "GG",]
+
+  ## Save the *original* lane size
+  initialNbSamplesPerLane <- nbSamplesPerLane
+  
+  ## Cap lane size to what is actually available
   nbSamplesPerLane <- min(nrow(index), nbSamplesPerLane)
 
   # print('generateListOfIndexesCombinations')
@@ -195,21 +316,135 @@ generateListOfIndexesCombinations <- function(index, nbSamplesPerLane, completeL
   # print(paste0('completeLane: ', completeLane))
   # print(paste0('choose(nrow(index), nbSamplesPerLane): ', choose(nrow(index), nbSamplesPerLane)))
   
+  ## Optionally shrink lane size to keep the search space sane
+  while (!completeLane &&
+         choose(nrow(index), nbSamplesPerLane) > 2e5 &&
+         nbSamplesPerLane > 2) {
+    nbSamplesPerLane <- nbSamplesPerLane - 1
+  }
+  
   # optimize nbSamplesPerLane to generate a reduced number of combinations of indices
-  while (!completeLane & choose(nrow(index), nbSamplesPerLane) > 2e5 & nbSamplesPerLane > 2) nbSamplesPerLane <- nbSamplesPerLane - 1
+  # while (!completeLane & choose(nrow(index), nbSamplesPerLane) > 2e5 & nbSamplesPerLane > 2) nbSamplesPerLane <- nbSamplesPerLane - 1
+  
   # print(paste0('nbSamplesPerLane: ', nbSamplesPerLane))
   # stop if too many combinations to test
   if (choose(nrow(index), nbSamplesPerLane) > 1e9) stop("Too many candidate combinations of indices to easily find a solution, please use different parameters.")
-  # generate the list of all the possible combinations
-  Clust <- makeCluster(max(c(detectCores(logical=FALSE)-1, 1)))
-  possibleCombinations <- combn(x=index$id, m=nbSamplesPerLane, simplify=FALSE)
-  indexesCombinations <- parLapply(cl=Clust, X=possibleCombinations, fun=function(x, index) index[index$id %in% x,], index=index)
-  # select only combinations of compatible indices before searching for a solution
-  if (selectCompIndexes) indexesCombinations <- indexesCombinations[parSapply(cl=Clust, X=indexesCombinations, FUN=areIndexesCompatible, chemistry=chemistry)]
-  stopCluster(Clust)
   
-  # print(paste0('indexesCombinations: ', indexesCombinations))
-  # stop("Halting script.")
+  ## -------------------------------------------------------------------
+  ## Gather the REQUIRED IDs coming from the Shiny table
+  ## (handles NULL, vector, or data-frame consistently)
+  ## -------------------------------------------------------------------
+   tryCatch({
+    
+    # print('generateListOfIndexesCombinations')
+    # isolate({
+    #    message("---- selectedRows (raw) ----")
+    #    message("class:  ", paste(class(selectedRows), collapse = ", "))
+    #    message("typeof: ", typeof(selectedRows))
+    #    print(selectedRows)                    # prints the function prototype
+    # })
+    sr <- selectedRows
+    # print(paste0('sr:', sr))
+    # -------------------------------------------------------------------
+    if (is.null(sr)                                             ||        # nothing
+        (is.data.frame(sr) && nrow(sr) == 0)                    ||
+        (length(sr) == 0)) {
+      
+      required_ids <- character(0)
+      
+    } else if (is.data.frame(sr)) {                                      # data-frame
+      
+      if (!"id" %in% names(sr))
+        stop("selectedRows is a data-frame but has no 'id' column")
+      required_ids <- as.character(sr$id)
+      
+    } else {                                                             # vector
+      required_ids <- as.character(sr)
+    }
+    
+  },  # <---------------------------- end of try block ------------------
+  
+  # Catch *any* ordinary error
+  error = function(e) {
+    message("❌  ERROR inside selectedRows processing: ", e$message)
+    print(e)                       # full condition (call, classes, etc.)
+    NULL
+  },
+  
+  # Catch req()/validate() aborts as well
+  shiny.silent.error = function(e) {
+    message("⚠️  req()/validate() aborted: ", conditionMessage(e))
+    NULL
+  })
+  
+  nRequired <- length(required_ids)
+  # print(paste0('required_ids: ', required_ids))
+  # print(paste0('nRequired: ', nRequired))
+  
+  ## Helper that turns a vector of IDs into the matching data.frame rows
+  df_from_ids  <- function(ids) index[index$id %in% ids, , drop = FALSE]
+  
+  ## -------------------------------------------------------------------
+  ##  CASE LOGIC
+  ## -------------------------------------------------------------------
+  ## CASE 1  ─ fewer required IDs than (reduced) lane size - generate all combinations and return those that contain required ids
+  if (nRequired < nbSamplesPerLane) {
+    
+    Clust <- parallel::makeCluster(max(c(parallel::detectCores(logical = FALSE) - 1, 1)))
+    
+    # All size-nbSamplesPerLane combos drawn from EVERY index
+    all_combos <- combn(index$id, nbSamplesPerLane, simplify = FALSE)
+    
+    if (nRequired == 0) {
+      ## No “must-have” indices → keep every combination
+      possibleCombinations <- all_combos
+    } else {
+      ## At least one required index → keep only combos that contain them all
+      possibleCombinations <- Filter(function(x) all(required_ids %in% x), all_combos)
+    }
+    
+    # Turn each vector of IDs into the full rows
+    indexesCombinations <-
+      parallel::parLapply(Clust, possibleCombinations, df_from_ids)
+    
+    # Optional compatibility filter
+    if (selectCompIndexes)
+      indexesCombinations <-
+      indexesCombinations[
+        parallel::parSapply(Clust, indexesCombinations,
+                            areIndexesCompatible, chemistry = chemistry)
+      ]
+    
+    parallel::stopCluster(Clust)
+    
+    ## CASE 2  ─ many required IDs, and they are ≥ initial lane size
+  } else if (nRequired >= initialNbSamplesPerLane) {
+    
+    # All combos of size *initial* lane size, but using only required IDs
+    possibleCombinations <-
+      combn(required_ids, initialNbSamplesPerLane, simplify = FALSE)
+    
+    indexesCombinations <- lapply(possibleCombinations, df_from_ids)
+    
+    if (selectCompIndexes)
+      indexesCombinations <-
+      indexesCombinations[
+        vapply(indexesCombinations,
+               areIndexesCompatible,
+               logical(1),
+               chemistry = chemistry)
+      ]
+    
+    ## CASE 3  ─ many required IDs, but fewer than the original lane size
+  } else {  # nRequired >= nbSamplesPerLane  &&  nRequired < initialNbSamplesPerLane
+    
+    # Return a single list element that contains *all* required IDs
+    indexesCombinations <- list(df_from_ids(required_ids))
+    
+    if (selectCompIndexes &&
+        !areIndexesCompatible(indexesCombinations[[1]], chemistry = chemistry))
+      warning("The only possible set of required indices is incompatible.")
+  }
   
   return(indexesCombinations)
 }
@@ -463,6 +698,7 @@ completeSolution <- function(partialSolution, index, multiplexingRate, unicityCo
       index.remaining <- index[!(index$id %in% partialSolution$id[partialSolution$pool==l]),]
     }
     if (nbSamplesToAdd > nrow(index.remaining)) return(NULL) # not enough remaining indices to complete the solution
+    
     indexesToAdd <- index.remaining[sample(1:nrow(index.remaining), nbSamplesToAdd, FALSE),]
     indexesToAdd$pool <- l
     partialSolution <- rbind.data.frame(partialSolution, 
@@ -538,7 +774,15 @@ findSolution <- function(indexesList, index, indexesList2=NULL, index2=NULL,
   last_non_null_solution <- NULL  # Track the last non-null solution
   
   nbTrials <- 1
-  if (nbSamples == multiplexingRate) {
+  
+  # Need to compare multiplexingRate to total number of indices (not number of samples)
+  # print(paste0('nbSamples: ', nbSamples))
+  # print(paste0('multiplexingRate: ', multiplexingRate))
+  # print(paste0('nrow(index): ', nrow(index)))
+  # print(paste0('length(indexesList): ', length(indexesList)))
+  # print(paste0('nbLanes: ', nbLanes))
+  
+  if (nrow(index) == multiplexingRate) {
     nbMaxTrials <- 1  # Only need a single trial if there is only one pool
   }
   while (nbTrials <= nbMaxTrials){
@@ -726,9 +970,12 @@ checkProposedSolution2 <- function(solution, chemistry){
   return(TRUE)
 }
 
-heatmapindex <- function(solution){
+heatmapindex <- function(solution, selectedRows){
   
   percentage_threshold <- 25
+  
+  # print('heatmapindex')
+  # print(paste0('selectedRows:', selectedRows$id))
   
   lengthSequence <- nchar(solution$sequence[1])
   lengthSequence1 <- nchar(solution$sequence1[1])
@@ -938,9 +1185,80 @@ heatmapindex <- function(solution){
   
   # extract and print index ids
   tmp <- unlist(lapply(splitsol, function(sol) c(NA, NA, NA, NA, sol$id, NA)))
-  text(x=ncol(seqmat)+0.25, y=(nrow(seqmat):1 - 0.5), labels=tmp[-length(tmp)], pos=4)
-  }
+  # text(x=ncol(seqmat)+0.25, y=(nrow(seqmat):1 - 0.5), labels=tmp[-length(tmp)], pos=4)
+  labs  <- tmp[-length(tmp)]
+  
+  ## bare ID = the part after “: ” and before any space / parentheses
+  ids   <- sub(" .*", "", sub("^.*: ", "", labs))
+  
+  ## character vector of colours: red for selected IDs, black otherwise
+  cols  <- ifelse(ids %in% selectedRows$id, "deeppink", "black")
+  
+  ## 1 ── build a font vector: 2 = bold, 1 = plain
+  font_vec <- ifelse(ids %in% selectedRows$id, 2, 1)   # ids is bare “P4_A01” etc.
+  
+  ## keep colours vector aligned with labels (NA labels get NA colours)
+  cols[is.na(labs)] <- NA
+  
+  ## draw the labels
+  text(
+    x     = ncol(seqmat) + 0.25,
+    y     = (nrow(seqmat):1) - 0.5,
+    labels = labs,
+    pos    = 4,          # left-align at (x, y)
+    col    = cols,        # <- red for selected, black otherwise
+    font   = font_vec      # bold if selected, plain otherwise
+  )
+  
+  # ## --------------------------------------------------------------------
+  # ## PREP
+  # ## --------------------------------------------------------------------
+  # tmp <- unlist(lapply(splitsol, function(sol) c(NA, NA, NA, NA, sol$id, NA)))
+  # labels <- tmp[-length(tmp)]                           # one row per cell
+  # sel_id <- selectedRows$id                            # data-frame column
+  # 
+  # ## helper: pull the “P4_A01” part out of “tmo: P4_A01 (206)”
+  # get_id <- function(z) sub(" .*", "", sub("^.*: ", "", z))
+  # 
+  # ## ----------------------------------------------------------------------
+  # ## NEW ─ filter out the placeholder rows  -------------------------------
+  # ## ----------------------------------------------------------------------
+  # keep      <- !is.na(labels)                       # TRUE only for real labels
+  # labels    <- labels[keep]                         # drop the NAs
+  # is_sel    <- get_id(labels) %in% sel_id
+  # 
+  # fg_col    <- ifelse(is_sel, "white", "black")
+  # bg_col    <- ifelse(is_sel, "grey25", "white")
+  # 
+  # ## Coordinates that match the *kept* rows -------------------------------
+  # y_all     <- nrow(seqmat):1 - 0.5                 # original y-seq
+  # x_all     <- rep(ncol(seqmat) + 2.0, length(y_all))
+  # 
+  # x <- x_all[keep]                                  # keep same rows only
+  # y <- y_all[keep]
+  # 
+  # print(paste0('tmp: ', tmp))
+  # print(paste0('keep: ', keep))
+  # print(paste0('labels: ', labels))
+  # print(paste0('sel_id: ', sel_id))
+  # print(paste0('is_sel: ', is_sel))
+  # print(paste0('x: ', x))
+  # print(paste0('y: ', y))
+  # 
+  # ## ----------------------------------------------------------------------
+  # ## Draw the boxed labels: all rows now line up perfectly
+  # ## ----------------------------------------------------------------------
+  # boxed.labels(
+  #   x, y, labels,
+  #   col    = fg_col,
+  #   bg     = bg_col,
+  #   adj    = c(0, 0.5),       # left-align at x
+  #   xpad   = 1.2,               # padding (char widths)
+  #   ypad   = 1.8
+  # )  
+}
 
+# border = NA,                # no rectangle outline
 
 # Function to calculate the percentage of each character in each position of color1 and color2
 calculate_color_percentages <- function(solution) {
