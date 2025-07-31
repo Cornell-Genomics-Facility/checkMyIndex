@@ -5,7 +5,7 @@ Search for a set of compatible indices for your sequencing experiment according 
 * the number of samples
 * the desired multiplexing rate (i.e. number of samples per pool/lane)
 * the constraint on the indices (none, use each one or each combination only once)
-* the inclusion of any indices that are req to appear in the solution
+* the inclusion of any indices that are require to appear in the solution
 
 ## Modifications in this fork (made by Cornell Genomics Facility)
 
@@ -94,7 +94,6 @@ Illumina has developed four types of chemistry: the four-channel for the HiSeq a
 * Genomics Facility at Cornell version 1.2.3: Bug fix in server code to use renderDT
 * Genomics Facility at Cornell version 1.3.0: Modifications to find the best solution from a given number of trials
 * Genomics Facility at Cornell version 1.4.0: Modifications to enable selection of required indices and find best solution that includes those indices
-* Genomics Facility at Cornell version 1.4.1: Bug fix to ignore weights when using separate i7 and i5 index files unless in UMI mode
 
 ## About checkMyIndex
 

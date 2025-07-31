@@ -249,20 +249,19 @@ test_GC_counts <- function(colors) {
 
 areIndexesCompatible <- function(index, chemistry, column="color"){
   # return TRUE if the input indices are compatible (i.e. can be used within the same pool/lane)
-  # print('areIndexesCompatible inside')  # //--- comment me out
-  # print(paste0('column: ', column))  # //--- comment me out
-  # print(paste0('index: ', index))  # //--- comment me out
-  # print(paste0('nrow(index): ', nrow(index)))  # //--- comment me out
+  # print('areIndexesCompatible')
+  # print(paste0('nrow(index): ', nrow(index)))
+  # return(TRUE)
   if (nrow(index)==1) return(TRUE)
   # print(paste0('column: ', column))
   # print(paste0('index$color: ', index$color))
   # print(paste0('strsplit(index[, column], "")', strsplit(index[, column], "")))
   matColors <- do.call("rbind", strsplit(index[, column], ""))
-  # print(paste0('matcolors: ', matColors))  # //--- comment me out
+  # print(paste0('matcolors: ', matColors))
   if (chemistry == "4"){
     sumRed <- apply(matColors, 2, function(x) sum(x=="R"))
     sumGreen <- nrow(matColors) - sumRed
-    # print(paste0('all(sumRed >= 1 & sumGreen >= 1):', (all(sumRed >= 1 & sumGreen >= 1))))  # //--- comment me out
+    # print(paste0('all(sumRed >= 1 & sumGreen >= 1):', (all(sumRed >= 1 & sumGreen >= 1))))
     return(all(sumRed >= 1 & sumGreen >= 1))
   }
   
@@ -283,9 +282,9 @@ areIndexesCompatible <- function(index, chemistry, column="color"){
     # Return true only if all positions pass and at least one position has green
     # return(all(positionCheck) && any(sumGreen >= 1))
     
-    # print(paste0('index: ', index))  # //--- comment me out
-    # print(paste0('sumGreen: ', sumGreen))  # //--- comment me out
-    # print(paste0('all(sumGreen >= 1): ', all(sumGreen >= 1)))  # //--- comment me out
+    # print(paste0('index: ', index))
+    # print(paste0('sumGreen: ', sumGreen))
+    # print(paste0('all(sumGreen >= 1): ', all(sumGreen >= 1)))
     
     # print('areIndexesCompatible:')
     # test_GC_counts(index$color)
@@ -464,8 +463,6 @@ searchOneSolution <- function(indexesList, index, indexesList2=NULL, index2=NULL
   compatibleCombinations <- vector(mode="list", length=nbLanes)
   areIndicesCompatible <- TRUE
   
-  # print('Got to searchOneSolution')  # //--- comment me out
-  
   # single-indexing or paired dual-indexing
   if (is.null(index2) | is.null(indexesList2)){
     k <- 1
@@ -567,8 +564,8 @@ searchOneSolution <- function(indexesList, index, indexesList2=NULL, index2=NULL
     inputNbSamplesPerLane2 <- nrow(indexesList2[[1]])
     compatibleCombinations2 <- vector(mode="list", length=nbLanes)
     k <- 1
-    # print('Second while loop: ')  # //--- comment me out
-    # print(paste0('nbLanes: ', nbLanes))  # //--- comment me out
+    # print('Second while loop: ')
+    # print(paste0('nbLanes: ', nbLanes))
     
     while (k <= nbLanes){
       # print(paste0("Start of while loop, k: ", k))
@@ -579,15 +576,15 @@ searchOneSolution <- function(indexesList, index, indexesList2=NULL, index2=NULL
         return(NULL)
       } else{
         i <- sample(1:length(indexesList), 1, FALSE)
-        i2 <- ifelse(i7i5pairing, i, sample(1:length(indexesList2), 1, FALSE))
+        # print(paste0("i: ", i))
         # if (areIndexesCompatible(indexesList[[i]], chemistry)){
         # areIndexesCompatible <- ((areIndexesCompatible(indexesList[[i]], chemistry)) & (areIndexesCompatible(indexesList2[[i2]], chemistry)))
-        # print('Before is.null(areIndicesCompatible')  # //--- comment me out
+        # print('Came from searchOneSolution3')
         if (is.null(areIndicesCompatible) || areIndicesCompatible) {
           areIndexesCompatible <- ((areIndexesCompatible(indexesList[[i]], chemistry)) & (areIndexesCompatible(indexesList2[[i2]], chemistry)))
         }
-        # print('After is.null(areIndicesCompatible')  # //--- comment me out
         compatibleCombinations[[k]] <- indexesList[[i]]
+        i2 <- ifelse(i7i5pairing, i, sample(1:length(indexesList2), 1, FALSE))
         # if (areIndexesCompatible(indexesList2[[i2]], chemistry)){
         compatibleCombinations2[[k]] <- indexesList2[[i2]]
         k <- k+1
@@ -600,7 +597,7 @@ searchOneSolution <- function(indexesList, index, indexesList2=NULL, index2=NULL
       }
       # print(paste0("End of while loop, k: ", k))
     }
-    # print('Got past second while loop')  # //--- comment me out
+    # print('Got past second while loop')
     solution <- data.frame(sample=1:(nbLanes*inputNbSamplesPerLane), 
                            pool=rep(1:nbLanes, each=inputNbSamplesPerLane), 
                            do.call("rbind", compatibleCombinations))
@@ -608,7 +605,7 @@ searchOneSolution <- function(indexesList, index, indexesList2=NULL, index2=NULL
                             pool=rep(1:nbLanes, each=inputNbSamplesPerLane2), 
                             do.call("rbind", compatibleCombinations2))
     
-    # print(paste0('Solution: ', solution))  # //--- comment me out
+    # print(paste0('Solution: ', solution))
     
     # remove indices starting with GG before completing the solutions if four-channel chemistry
     if (chemistry == "2"){
