@@ -126,15 +126,28 @@ shinyServer(function(input, output, session) {
       index2 <- NULL
 
       # Check inputFile2 as normal
-      # if (!is.null(inputFile2)) {
-      #   if (file.exists(inputFile2)) {
-      #     index2 <- readIndexesFileWithWeights(inputFile2)$index
-      #     index2 <- addColors(index2, input$chemistry)
-      #     index2$score <- scores(index2$sequence)
-      #   }
-      # } else {
-      #   index2 <- NULL
-      # }
+      if (!is.null(fileInput2())) {
+        file2 <- fileInput2()$datapath
+
+        if (file.exists(file2)) {
+          result <- tryCatch(
+            readIndexesFileWithWeights(file2),
+            error = function(e) {
+              msg <- conditionMessage(e)      # the message from readIndexesFileWithWeights()
+              if (grepl("cannot open the connection", msg, fixed = TRUE)) {
+                ## file path wrong / permission denied
+                stop("Index file could not be opened (check the path and permissions):\n", msg)
+              } else {
+                ## fallback: rethrow with extra context
+                stop("Unexpected error while loading index file:\n", msg)
+              }
+            }
+          )
+          index2 <- result$index
+          index2 <- addColors(index2, input$chemistry)
+          index2$score <- scores(index2$sequence)
+        }
+      }
     }
     
     return(list(index = index, index2 = index2))
@@ -215,66 +228,11 @@ shinyServer(function(input, output, session) {
     initialSelected()          # already a 1-column data-frame (id)
   })
   
-  # selectedRows <- reactive({
-  #   ## rows clicked in the table
-  #   rows_clicked <- input$inputIndex_rows_selected
-  #   src_table    <- inputIndexes()$index
-  #   
-  #   clicked <- if (length(rows_clicked)) {
-  #     src_table[rows_clicked , "id", drop = FALSE]   # 1-col df
-  #   } else {
-  #     src_table[0 , "id", drop = FALSE]              # empty df with id col
-  #   }
-  #   
-  #   ## union of pre-selected + clicked (remove duplicates by id)
-  #   print(paste0('initialSelected(): ', initialSelected()))
-  #   print(paste0('clicked: ', clicked))
-  #   out <- rbind(initialSelected(), clicked)
-  #   out <- out[!duplicated(out$id), , drop = FALSE]
-  #   out
-  # })
-  
   # Example: print the chosen rows to the console
   observeEvent(selectedRows(), {
     cat("--- rows the user clicked ---\n")
     print(selectedRows())
   })
-  
-  # observeEvent(
-  #  {
-  #    selectedRows()          # the click
-  #     rv$requiredIndices      # the loaded table
-  #   },
-  #   ignoreNULL = FALSE,
-  #   {
-  #     
-  #   print("observer fired")
-  #   print(selectedRows())
-  #   
-  #   ## 0.  Make sure the table has been loaded
-  #   req(rv$requiredIndices)
-  #   
-  #   if (!is.data.frame(rv$requiredIndices)) {
-  #      stop("rv$requiredIndices should be a data-frame; got class: ",
-  #           paste(class(rv$requiredIndices), collapse = ", "))
-  #   }
-  #   
-  #   sel <- input$inputIndex_rows_selected          # integer vector (may be integer(0))
-  #   print(str(rv$requiredIndices))
-  #   print(sel)
-  #   
-  #   ## 1.  Update the “Selected” flag shown in the table
-  #   rv$requiredIndices$Selected <- FALSE
-  #   if (length(sel)) rv$requiredIndices$Selected[sel] <- TRUE
-  #   
-  #   ## 2.  Keep selectedRows as a *data-frame* at all times
-  #   rv$selectedRows <-
-  #     if (length(sel)) {
-  #       rv$requiredIndices[sel, , drop = FALSE]     # rows user clicked
-  #     } else {
-  #       rv$requiredIndices[0, , drop = FALSE]       # same columns, zero rows
-  #     }
-  # })
   
   output$textIndex <- renderText({tryCatch({
     index <- inputIndex()
@@ -328,6 +286,7 @@ shinyServer(function(input, output, session) {
   #   index2$score <- scores(index2$sequence)
   #   return(index2)
   # })
+  
   output$indexUploaded2 <- reactive({!is.null(inputIndex2())})
   outputOptions(output, "indexUploaded2", suspendWhenHidden=FALSE)
   output$inputIndex2 <- DT::renderDT({inputIndex2()}, options=list(paging=FALSE, searching=FALSE, info=FALSE))
@@ -417,8 +376,8 @@ shinyServer(function(input, output, session) {
     }
   })
   
-  # generate list(s) of indices
-  generateList <- reactive({
+  # generate list(s) of indices (keep existing weights)
+  generateListKeepWeights <- reactive({
     index <- inputIndex()
     # print(paste0('column names: ', names(index)))
     # print(paste0('index[, -5]: ', index[, -5]))
@@ -431,11 +390,29 @@ shinyServer(function(input, output, session) {
                                              chemistry = input$chemistry,
                                              selectedRows = selectedRows()))
   })
+
+  # generate list(s) of indices (set weights all weights to 1)
+  generateListRemoveWeights <- reactive({
+    index <- inputIndex()
+    index$weight <- 1
+    # print(paste0('column names: ', names(index)))
+    # print(paste0('index[, -5]: ', index[, -5]))
+    # print(paste0('input$multiplexingRate: ', input$multiplexingRate))
+    
+    return(generateListOfIndexesCombinations(index = index[, -6],
+                                             nbSamplesPerLane = as.numeric(input$multiplexingRate),
+                                             completeLane = input$completeLane,
+                                             selectCompIndexes = input$selectCompIndexes,
+                                             chemistry = input$chemistry,
+                                             selectedRows = selectedRows()))
+  })
+
   generateList2 <- reactive({
     index2 <- inputIndex2()
     if (is.null(index2)){
       return(NULL)
     } else{
+      index2$weight <- 1
       return(generateListOfIndexesCombinations(index = index2[, -6],
                                                nbSamplesPerLane = as.numeric(input$multiplexingRate),
                                                completeLane = input$completeLane,
@@ -450,6 +427,10 @@ shinyServer(function(input, output, session) {
     if (is.null(index) & is.null(index2)){
       return(NULL)
     } else{
+      # if (!input$i7i5pairing) {
+      #   index$weight <- 1
+      #   index2$weight <- 1
+      # }
       if (input$chemistry == "2"){
         mask <- which(substr(index$sequence, 1, 2) == "GG" | substr(index2$sequence, 1, 2) == "GG")
         if (length(mask) > 0){
@@ -508,7 +489,7 @@ shinyServer(function(input, output, session) {
         index <- inputIndex()[, -6]
         index2 <- inputIndex2()[, -6]
         if (is.null(index2)){
-          indexesList <- generateList()
+          indexesList <- generateListKeepWeights()
           indexesList2 <- NULL
         } else{
           if (input$i7i5pairing){
@@ -526,12 +507,18 @@ shinyServer(function(input, output, session) {
             index2 <- NULL
             indexesList2 <- NULL
           } else{
-            indexesList <- generateList()
+            index$weight <- 1
+            index2$weight <- 1
+            indexesList <- generateListRemoveWeights()
             indexesList2 <- generateList2()
           }
         }
-        # print(paste0("Index: ", index))
-        # print(paste0("Index2: ", index2))
+        
+        # print(paste0("indexesList: ", indexesList))  # //--- comment me out
+        # testWeight <- index$weight  # //--- comment me out
+        # print("Index$weight: ")  # //--- comment me out
+        # print(testWeight)  # //--- comment me out
+        
         solution <- findSolution(indexesList = indexesList,
                                  index = index,
                                  indexesList2 = indexesList2,
@@ -599,7 +586,7 @@ shinyServer(function(input, output, session) {
         
         # print(paste0("solution_color_percentages_with_weights: ", solution_color_percentages_with_weights))
         
-      }, message="R is looking for a solution...", max=0)
+      }, message="App is looking for a solution...", max=0)
       shinyjs::show("proposedSolution")
       shinyjs::show("visualization")
       shinyjs::show("colorBalancing")
@@ -631,6 +618,9 @@ shinyServer(function(input, output, session) {
     else character(0)
     # print(paste0('hilite: ', hilite))
     
+    ## **Index of the column to hide (0‑based for JS)**
+    hide_idx <- which(names(df) == "areIndicesCompatible") - 1
+    
     ## Build the table ------------------------------------------------
     DT::datatable(
       df,
@@ -638,7 +628,10 @@ shinyServer(function(input, output, session) {
       options  = list(
         paging    = FALSE,
         searching = FALSE,
-        info      = FALSE
+        info      = FALSE,
+        columnDefs  = if (length(hide_idx))
+          list(list(visible = FALSE, targets = hide_idx))
+        else NULL        # do nothing if column not present
       )
     ) %>%
       ## Colour EVERY column in the matching rows --------------------
