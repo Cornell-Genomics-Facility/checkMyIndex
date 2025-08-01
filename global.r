@@ -7,7 +7,7 @@ library(stringr)
 
 
 checkMyIndexVersion <- "1.0.2"
-cornellCheckMyIndexVersion <- "1.4.0"
+cornellCheckMyIndexVersion <- "1.4.2"
 
 readIndexesFile <- function(file){
   index <- tryCatch({read.table(file, header=FALSE, sep="\t", stringsAsFactors=FALSE, col.names=c("id","sequence"))},

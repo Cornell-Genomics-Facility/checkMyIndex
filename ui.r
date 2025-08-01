@@ -17,7 +17,10 @@ shinyUI(fluidPage(theme = "bootstrap.min.css", shinyjs::useShinyjs(),
                     )
                   ),
                   
-                  titlePanel(title=div(img(src="dna.png", width=50), strong("Search for a set of compatible indices for your sequencing experiment")), windowTitle="checkMyIndex"),
+                  titlePanel(title=div(img(src="dna.png", width=50), 
+                            strong("Search for a set of compatible indices for your sequencing experiment"), 
+                            span(style = "font-size: 80%;", paste0("(version ", cornellCheckMyIndexVersion, ")"))), 
+                            windowTitle="checkMyIndex"),
                   
                   sidebarLayout(
                     

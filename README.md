@@ -95,6 +95,7 @@ Illumina has developed four types of chemistry: the four-channel for the HiSeq a
 * Genomics Facility at Cornell version 1.3.0: Modifications to find the best solution from a given number of trials
 * Genomics Facility at Cornell version 1.4.0: Modifications to enable selection of required indices and find best solution that includes those indices
 * Genomics Facility at Cornell version 1.4.1: Bug fix to ignore weights when using separate i7 and i5 index files unless in UMI mode
+* Genomics Facility at Cornell version 1.4.2: Modifications to add version number to app title text
 
 ## About checkMyIndex
 
