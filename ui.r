@@ -179,15 +179,15 @@ shinyUI(fluidPage(theme = "bootstrap.min.css", shinyjs::useShinyjs(),
                                  p("The original application was developed at the Biomics pole of the Institut Pasteur by Hugo Varet and an ", a("Application Note", href="https://doi.org/10.1093/bioinformatics/bty706"), 
                                    "describing it has been published in 2018 in Bioinformatics. Send an e-mail to", a("hugo.varet@pasteur.fr"), "for any suggestion or bug report."),
                                  p("Source code and instructions to run the original application locally are available at the ", a("PF2 - Institut Pasteur GitHub", href="https://github.com/PF2-pasteur-fr/checkMyIndex"), "repository. "),
-
+                                 
                                  p("Modifications to include Illumina XLEAP-SBS chemistry have been made by the Genomics Facility at Cornell. These modifcations are available at the ", a("Cornell Genomics Facility GitHub", href="https://github.com/Cornell-Genomics-Facility/checkMyIndex"), "repository. "),
-
+                                 
                                  p("Please note that checkMyIndex is provided without any guarantees as to its accuracy."),
                                  
                                  
                                  h3("Version"),
                                  p(paste0("Software based on the Institut Pasteur checkMyIndex version ", checkMyIndexVersion, ".")),
-                                 p(paste0("Genomics Facility at Cornell checkMyIndex version ", cornellCheckMyIndexVersion, ", with modifications to include XLEAP-SBS chemistry.")),
+                                 p(paste0("Genomics Facility at Cornell checkMyIndex version ", cornellCheckMyIndexVersion, ". See the ", a("Cornell Genomics Facility GitHub", href="https://github.com/Cornell-Genomics-Facility/checkMyIndex"), "repository for a full update history.")),
                                  div(img(src="logo_c3bi_citech.jpg", width=300), style="text-align: center;"))
                         
                       )

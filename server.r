@@ -5,6 +5,9 @@ options(shiny.sanitize.errors = FALSE,   # to display informative error messages
 
 shinyServer(function(input, output, session) {
   
+  # Auto kill app when browser window closed (https://github.com/daattali/advanced-shiny/tree/master/auto-kill-app)
+  session$onSessionEnded(stopApp)
+  
   # reset input parameters when pressing the reset button
   observeEvent(input$reset, {
     shinyjs::reset("allParameters")
