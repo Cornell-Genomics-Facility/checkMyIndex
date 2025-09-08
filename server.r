@@ -584,6 +584,42 @@ shinyServer(function(input, output, session) {
                                              input$chemistry, 
                                             "color2"))
         }
+        
+        hammingDistanceScoreCutoff <- 3
+        hammingDistanceScoreGreaterThanCuttoff <- TRUE
+        
+        # TRUE if every index in this subset has min Hamming distance >= cutoff
+        hamming_ok <- function(df, cutoff, column = "score") {
+          seqs <- df[[column]]
+          seqs <- seqs[!is.na(seqs)]
+          if (length(seqs) <= 1L) return(TRUE)
+          # "scores" returns, for each seq, min distance to the others
+          min(scores(seqs)) >= cutoff   # equivalent to all(scores(seqs) >= cutoff)
+        }
+        
+        pool_list <- split(solution, solution$pool)
+        
+        if ("sequence" %in% names(solution)) {
+          # Single-index case
+          hammingDistanceScoreGreaterThanCuttoff <- all(vapply(
+            pool_list,
+            function(df) hamming_ok(df, hammingDistanceScoreCutoff, "sequence"),
+            logical(1)
+          ))
+          
+        } else if (all(c("sequence1","sequence2") %in% names(solution))) {
+          # Dual-index case: require BOTH i7 and i5 to meet the cutoff
+          hammingDistanceScoreGreaterThanCuttoff <- all(vapply(
+            pool_list,
+            function(df) {
+              ok1 <- hamming_ok(df, hammingDistanceScoreCutoff, "sequence1")
+              ok2 <- hamming_ok(df, hammingDistanceScoreCutoff, "sequence2")
+              ok1 && ok2
+            },
+            logical(1)
+          ))
+        }
+        
         # print(paste0("areIndicesCompatible: ", areIndicesCompatible))
         # test_GC_counts(c(solution$color1, solution$color2))
         
@@ -597,7 +633,8 @@ shinyServer(function(input, output, session) {
       # print(paste0("Solution: ", solution))
       return(list(solution = solution, 
                   colorPercentagesFormattedOutputWide = colorPercentagesFormattedOutputWide,
-                  areIndicesCompatible = areIndicesCompatible))
+                  areIndicesCompatible = areIndicesCompatible,
+                  hammingDistanceScoreGreaterThanCuttoff = hammingDistanceScoreGreaterThanCuttoff))
     }
   })
   
@@ -694,11 +731,15 @@ shinyServer(function(input, output, session) {
     }
   })
   
-  output$compatibilityWarning <- renderText({
-    if (!is.null(tryCatch({displaySolution()$areIndicesCompatible}, error = function(e) NULL)) && !displaySolution()$areIndicesCompatible){
-      return("****  Warning: Colors in indices are not compatible in at least one pool/lane  ****")
+    output$compatibilityWarning <- renderText({
+    if (!is.null(tryCatch({displaySolution()$hammingDistanceScoreGreaterThanCuttoff}, error = function(e) NULL)) && !displaySolution()$hammingDistanceScoreGreaterThanCuttoff){
+      return("****  Warning: Score (distance between indices) is less that required minimum  ****")
     }
-    return("")
+    else if (!is.null(tryCatch({displaySolution()$areIndicesCompatible}, error = function(e) NULL)) && !displaySolution()$areIndicesCompatible){
+      return("****  Warning: Colors in indices are not compatible in at least one pool/lane  ****")
+    } else {
+      return("")
+    }
   })
   
   output$compatibilityWarning2 <- renderText({

@@ -187,7 +187,8 @@ shinyUI(fluidPage(theme = "bootstrap.min.css", shinyjs::useShinyjs(),
                                  
                                  h3("Version"),
                                  p(paste0("Software based on the Institut Pasteur checkMyIndex version ", checkMyIndexVersion, ".")),
-                                 p(paste0("Genomics Facility at Cornell checkMyIndex version ", cornellCheckMyIndexVersion, ". See the ", a("Cornell Genomics Facility GitHub", href="https://github.com/Cornell-Genomics-Facility/checkMyIndex"), "repository for a full update history.")),
+                                 p(paste0("Genomics Facility at Cornell checkMyIndex version ", cornellCheckMyIndexVersion, ".")), 
+                                 p("See the ", a("Cornell Genomics Facility GitHub", href="https://github.com/Cornell-Genomics-Facility/checkMyIndex"), "repository for a full update history."),
                                  div(img(src="logo_c3bi_citech.jpg", width=300), style="text-align: center;"))
                         
                       )
