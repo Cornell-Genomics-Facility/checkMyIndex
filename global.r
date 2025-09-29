@@ -3,11 +3,12 @@ library(parallel)
 library(dplyr)
 library(tidyr)
 library(stringr)
+library(rlang)
 # library(plotrix)            # boxedtext()
 
 
 checkMyIndexVersion <- "1.0.2"
-cornellCheckMyIndexVersion <- "1.4.4"
+cornellCheckMyIndexVersion <- "1.4.5"
 
 readIndexesFile <- function(file){
   index <- tryCatch({read.table(file, header=FALSE, sep="\t", stringsAsFactors=FALSE, col.names=c("id","sequence"))},
@@ -903,33 +904,33 @@ findSolution <- function(indexesList, index, indexesList2=NULL, index2=NULL,
 checkProposedSolution <- function(solution, unicityConstraint, chemistry){
   # indices not unique
   if (unicityConstraint=="index" & any(duplicated(solution$id))){
-    stop("The solution proposed uses some indices several times. Thanks to report this error to Hugo Varet (hugo.varet@pasteur.fr)")
+    stop("The solution proposed uses some indices several times.")
   }
   # indices not unique within a pool/lane
   if (any(sapply(split(solution$id, solution$pool), function(x) any(duplicated(x))))){
-    stop("The solution proposed uses some indices several times within a lane. Thanks to report this error to Hugo Varet (hugo.varet@pasteur.fr)")
+    stop("The solution proposed uses some indices several times within a lane.")
   }
   # several pools/lanes with the same combination of indices
   if (unicityConstraint=="lane" & any(duplicated(split(solution$id, solution$pool)))){
-    stop("The solution proposed uses some combinations of indices several times. Thanks to report this error to Hugo Varet (hugo.varet@pasteur.fr)")
+    stop("The solution proposed uses some combinations of indices several times.")
   }
   # different number of samples on the pools/lanes
   if (length(table(table(solution$pool))) > 1){
-    stop("The solution proposed uses different numbers of samples per lane. Thanks to report this error to Hugo Varet (hugo.varet@pasteur.fr)")
+    stop("The solution proposed uses different numbers of samples per lane.")
   }
   # indices not compatible in at least one pool/lane
   # print('Came from checkProposedSolution')
   if (any(!sapply(split(solution, solution$pool), areIndexesCompatible, chemistry))){
-    # stop("The solution proposed uses incompatible indices Thanks to report this error to Hugo Varet (hugo.varet@pasteur.fr)")
+    # stop("The solution proposed uses incompatible indices.")
     return(FALSE)
   }
   # two-channel chemistry and indices starting with GG
   if (chemistry == "2" && any(sapply(solution$sequence, substr, 1, 2) == "GG")){
-    stop("Indices starting with GG are not compatible with the chosen chemistry. Thanks to report this error to Hugo Varet (hugo.varet@pasteur.fr)")
+    stop("Indices starting with GG are not compatible with the chosen chemistry.")
   }
   # one-channel chemistry and all indices starting with GG
   if (chemistry == "1" && any(sapply(lapply(split(solution$sequence, solution$pool), substr, 1, 2), function(x) all(x=="GG")))){
-    stop("Having all the indices of a pool starting with GG is not compatible with the chosen chemistry. Thanks to report this error to Hugo Varet (hugo.varet@pasteur.fr)")
+    stop("Having all the indices of a pool starting with GG is not compatible with the chosen chemistry.")
   }
   return(TRUE)
 }
@@ -938,37 +939,37 @@ checkProposedSolution <- function(solution, unicityConstraint, chemistry){
 checkProposedSolution2 <- function(solution, chemistry){
   # indices not unique within a pool/lane
   if (any(sapply(split(paste(solution$id1, solution$id2, sep="-"), solution$pool), function(x) any(duplicated(x))))){
-    stop("The solution proposed uses some dual-index combinations several times within a lane. Thanks to report this error to Hugo Varet (hugo.varet@pasteur.fr)")
+    stop("The solution proposed uses some dual-index combinations several times within a lane.")
   }
   # different number of samples on the pools/lanes
   if (length(table(table(solution$pool))) > 1){
-    stop("The solution proposed uses different numbers of samples per lane. Thanks to report this error to Hugo Varet (hugo.varet@pasteur.fr)")
+    stop("The solution proposed uses different numbers of samples per lane.")
   }
   # indices not compatible in at least one pool/lane
   # print('Came from checkProposedSolution2')
   sol1 <- data.frame(id=solution$id1, sequence=solution$sequence1, color=solution$color1, stringsAsFactors = FALSE)
   if (any(!sapply(split(sol1, solution$pool), areIndexesCompatible, chemistry))){
-    # stop("The solution proposed uses incompatible indices. Thanks to report this error to Hugo Varet (hugo.varet@pasteur.fr)")
+    # stop("The solution proposed uses incompatible indices.")
     return(FALSE)
   }
   sol2 <- data.frame(id=solution$id2, sequence=solution$sequence2, color=solution$color2, stringsAsFactors = FALSE)
   if (any(!sapply(split(sol2, solution$pool), areIndexesCompatible, chemistry))){
-    # stop("The solution proposed uses incompatible indices. Thanks to report this error to Hugo Varet (hugo.varet@pasteur.fr)")
+    # stop("The solution proposed uses incompatible indices.")
     return(FALSE)
   }
   # two-channel chemistry and indices starting with GG
   if (chemistry == "2" && any(sapply(solution$sequence1, substr, 1, 2) == "GG")){
-    stop("Indices starting with GG are not compatible with the chosen chemistry. Thanks to report this error to Hugo Varet (hugo.varet@pasteur.fr)")
+    stop("Indices starting with GG are not compatible with the chosen chemistry.")
   }
   if (chemistry == "2" && any(sapply(solution$sequence2, substr, 1, 2) == "GG")){
-    stop("Indices starting with GG are not compatible with the chosen chemistry. Thanks to report this error to Hugo Varet (hugo.varet@pasteur.fr)")
+    stop("Indices starting with GG are not compatible with the chosen chemistry.")
   }
   # one-channel chemistry and all indices starting with GG
   if (chemistry == "1" && any(sapply(lapply(split(solution$sequence1, solution$pool), substr, 1, 2), function(x) all(x=="GG")))){
-    stop("Having all the indices of a pool starting with GG is not compatible with the chosen chemistry. Thanks to report this error to Hugo Varet (hugo.varet@pasteur.fr)")
+    stop("Having all the indices of a pool starting with GG is not compatible with the chosen chemistry.")
   }
   if (chemistry == "1" && any(sapply(lapply(split(solution$sequence2, solution$pool), substr, 1, 2), function(x) all(x=="GG")))){
-    stop("Having all the indices of a pool starting with GG is not compatible with the chosen chemistry. Thanks to report this error to Hugo Varet (hugo.varet@pasteur.fr)")
+    stop("Having all the indices of a pool starting with GG is not compatible with the chosen chemistry.")
   }
   return(TRUE)
 }
@@ -1004,14 +1005,23 @@ heatmapindex <- function(solution, selectedRows){
   pools <- sort(as.numeric(unique(str_extract(colnames(solution_color_percentages), "^pool(\\d+)") %>% 
                                     str_replace("pool", ""))))
   
-  num_pools <- length(pools)
-  numberPositions <- 1 + 
-    sum(as.numeric(lengthSequence %||% 0), 
-        as.numeric(lengthSequence1 %||% 0), 
-        as.numeric(lengthSequence2 %||% 0), 
-        na.rm = TRUE)
+  # returns x unless it's NULL (optionally also treats length-0 as NULL)
+  coalesce0 <- function(x) if (is.null(x) || length(x) == 0) 0 else x
   
-  lengthSequence_first_col <- sum(as.numeric(lengthSequence %||% 0), as.numeric(lengthSequence1 %||% 0), na.rm = TRUE)
+  num_pools <- length(pools)
+  
+  numberPositions <- 1 + sum(
+    as.numeric(coalesce0(lengthSequence)),
+    as.numeric(coalesce0(lengthSequence1)),
+    as.numeric(coalesce0(lengthSequence2)),
+    na.rm = TRUE
+  )
+  
+  lengthSequence_first_col <- sum(
+    as.numeric(coalesce0(lengthSequence)),
+    as.numeric(coalesce0(lengthSequence1)),
+    na.rm = TRUE
+  )
   # print(paste0('lengthSequence_first_col: ', lengthSequence_first_col))
   # print(paste0('numberPositions: ', numberPositions))
   

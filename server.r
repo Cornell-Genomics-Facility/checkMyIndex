@@ -454,14 +454,32 @@ shinyServer(function(input, output, session) {
   
   # text describing the solution
   output$textDescribingSolution <- renderText({
-    if (!is.null(tryCatch({displaySolution()$solution}, error = function(e) NULL))){
-      paste("Below is a solution for", as.numeric(input$nbSamples)/as.numeric(input$multiplexingRate),
-            "pool(s) of", input$multiplexingRate, "samples using the parameters specified. The table contains
-             one row per sample to be sequenced and several columns: pool/lane labels, index ids, index sequences,
-             the corresponding colors according to the chosen Illumina chemistry and a score equal to the minimum
-             number of mismatches with the other indices of the pool/lane.")
-    } else{
-      "Please load indices and then press the \"Search for a solution\" button."
+    err_msg <- NULL
+    
+    sol <- tryCatch(
+      {
+        displaySolution()$solution
+      },
+      error = function(e) {
+        err_msg <<- conditionMessage(e)
+        NULL
+      }
+    )
+    
+    if (!is.null(sol)) {
+      paste(
+        "Below is a solution for",
+        as.numeric(input$nbSamples) / as.numeric(input$multiplexingRate),
+        "pool(s) of", input$multiplexingRate, "samples using the parameters specified.",
+        "The table contains one row per sample to be sequenced and several columns:",
+        "pool/lane labels, index ids, index sequences, the corresponding colors according to",
+        "the chosen Illumina chemistry and a score equal to the minimum number of mismatches",
+        "with the other indices of the pool/lane."
+      )
+    } else {
+      base <- 'Please load indices and then press the "Search for a solution" button.'
+      app_error <- 'The app encountered an error - please let Paul know about it (prm88@cornell.edu). '
+      if (is.null(err_msg)) base else paste0(app_error, "Error: ", err_msg)
     }
   })
   
@@ -691,17 +709,45 @@ shinyServer(function(input, output, session) {
   })
   
   # text describing the color balancing
-   output$textDescribingColorBalancing <- renderText({
-    if (!is.null(tryCatch({displaySolution()$colorPercentagesFormattedOutputWide}, error = function(e) NULL))){
-      paste("Below are the color percentages for", as.numeric(input$nbSamples)/as.numeric(input$multiplexingRate),
-            "pool(s) of", input$multiplexingRate, "samples using the parameters specified. The table contains 
-             one row for each position (1 - 8) in each color column (color1 and color2), and shows the respective 
-             percentages for each of the red, green, and blue colors in that position (the '-' shows the percentage 
-             where no color is present).")
-    } else{
-      "Please load indices and then press the \"Search for a solution\" button."
+  output$textDescribingColorBalancing <- renderText({
+    err_msg <- NULL
+    
+    wide <- tryCatch(
+      {
+        displaySolution()$colorPercentagesFormattedOutputWide
+      },
+      error = function(e) {
+        err_msg <<- conditionMessage(e)
+        NULL
+      }
+    )
+    
+    if (!is.null(wide)) {
+      paste(
+        "Below are the color percentages for",
+        as.numeric(input$nbSamples) / as.numeric(input$multiplexingRate),
+        "pool(s) of", input$multiplexingRate, "samples using the parameters specified.",
+        "The table contains one row for each position (1 - 8) in each color column (color1 and color2),",
+        "and shows the respective percentages for each of the red, green, and blue colors in that position",
+        "(the '-' shows the percentage where no color is present)."
+      )
+    } else {
+      base <- 'Please load indices and then press the "Search for a solution" button.'
+      app_error <- 'The app encountered an error - please let Paul know about it (prm88@cornell.edu). '
+      if (is.null(err_msg)) base else paste0(app_error, "Error: ", err_msg)
     }
   })
+  # output$textDescribingColorBalancing <- renderText({
+  #   if (!is.null(tryCatch({displaySolution()$colorPercentagesFormattedOutputWide}, error = function(e) NULL))){
+  #     paste("Below are the color percentages for", as.numeric(input$nbSamples)/as.numeric(input$multiplexingRate),
+  #           "pool(s) of", input$multiplexingRate, "samples using the parameters specified. The table contains 
+  #            one row for each position (1 - 8) in each color column (color1 and color2), and shows the respective 
+  #            percentages for each of the red, green, and blue colors in that position (the '-' shows the percentage 
+  #            where no color is present).")
+  #   } else{
+  #     "Please load indices and then press the \"Search for a solution\" button."
+  #   }
+  # })
   
   # Render color balancing data table
   # output$colorPercentagesFormattedOutputWide <- DT::renderDT({
@@ -720,20 +766,48 @@ shinyServer(function(input, output, session) {
    
   # text describing the heatmap
   output$textDescribingHeatmap <- renderText({
-    if (!is.null(tryCatch({displaySolution()$solution}, error = function(e) NULL))){
-      paste0("The plot below allows to vizualize the proposed solution. Samples (in rows) are grouped by pool/lane
-             and each nucleotide of each index is displayed with a color according to the chosen Illumina chemistry. 
-             One can thus quickly check whether each color is used at each position. Note that sample ids (from 1 to ",
-             as.numeric(input$nbSamples), ") are printed on the left while index ids and sample weights are printed ",
-             "on the right, followed by sample weights in parentheses.")
-    } else{
-      "Please load indices and then press the \"Search for a solution\" button."
+    err_msg <- NULL
+    
+    sol <- tryCatch(
+      {
+        displaySolution()$solution
+      },
+      error = function(e) {
+        err_msg <<- conditionMessage(e)
+        NULL
+      }
+    )
+    
+    if (!is.null(sol)) {
+      paste0(
+        "The plot below allows to vizualize the proposed solution. Samples (in rows) are grouped by pool/lane ",
+        "and each nucleotide of each index is displayed with a color according to the chosen Illumina chemistry. ",
+        "One can thus quickly check whether each color is used at each position. Note that sample ids (from 1 to ",
+        as.numeric(input$nbSamples),
+        ") are printed on the left while index ids and sample weights are printed ",
+        "on the right, followed by sample weights in parentheses."
+      )
+    } else {
+      base <- 'Please load indices and then press the "Search for a solution" button.'
+      app_error <- 'The app encountered an error - please let Paul know about it (prm88@cornell.edu). '
+      if (is.null(err_msg)) base else paste0(app_error, "Error: ", err_msg)
     }
   })
+  # output$textDescribingHeatmap <- renderText({
+  #   if (!is.null(tryCatch({displaySolution()$solution}, error = function(e) NULL))){
+  #     paste0("The plot below allows to vizualize the proposed solution. Samples (in rows) are grouped by pool/lane
+  #            and each nucleotide of each index is displayed with a color according to the chosen Illumina chemistry. 
+  #            One can thus quickly check whether each color is used at each position. Note that sample ids (from 1 to ",
+  #            as.numeric(input$nbSamples), ") are printed on the left while index ids and sample weights are printed ",
+  #            "on the right, followed by sample weights in parentheses.")
+  #   } else{
+  #     "Please load indices and then press the \"Search for a solution\" button."
+  #   }
+  # })
   
     output$compatibilityWarning <- renderText({
     if (!is.null(tryCatch({displaySolution()$hammingDistanceScoreGreaterThanCuttoff}, error = function(e) NULL)) && !displaySolution()$hammingDistanceScoreGreaterThanCuttoff){
-      return("****  Warning: Score (distance between indices) is less that required minimum  ****")
+      return("****  Warning: Insufficient distance between some indices to allow for error correction  ****")
     }
     else if (!is.null(tryCatch({displaySolution()$areIndicesCompatible}, error = function(e) NULL)) && !displaySolution()$areIndicesCompatible){
       return("****  Warning: Colors in indices are not compatible in at least one pool/lane  ****")

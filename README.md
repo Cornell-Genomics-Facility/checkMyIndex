@@ -98,6 +98,7 @@ Illumina has developed four types of chemistry: the four-channel for the HiSeq a
 * Genomics Facility at Cornell version 1.4.2: Modifications to add version number to app title text
 * Genomics Facility at Cornell version 1.4.3: Automatically stop processing when browser window is closed
 * Genomics Facility at Cornell version 1.4.4: Add a warning message to proposed flowcell design tab if any score in a solution is less than 3
+* Genomics Facility at Cornell version 1.4.5: Bug fix and better error reporting
 
 ## About checkMyIndex
 
