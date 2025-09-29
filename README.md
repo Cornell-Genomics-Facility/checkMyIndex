@@ -1,3 +1,5 @@
+![checkMyIndex](./header_image.png)
+
 # checkMyIndex
 
 Search for a set of compatible indices for your sequencing experiment according to:
