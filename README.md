@@ -11,13 +11,9 @@ Search for a set of compatible indices for your sequencing experiment according 
 
 ## Run Shiny application on server
 
-### Private Cornell version (you must be behind Cornell's firewall to access this version)
+Click [Private Cornell version](http://cbsugg02.biohpc.cornell.edu:8025/CMI2/) to use the Cornell shiny interface of *checkMyIndex* (you must be behind Cornell's firewall to access this version)
 
-Click [Cornell version](http://cbsugg02.biohpc.cornell.edu:8025/CMI2/) to use the Cornell shiny interface of *checkMyIndex*.
-
-### Public website for the original Pasteur Institute version
-
-Click [original version](https://checkmyindex.pasteur.fr/) to use the original shiny interface of *checkMyIndex*.
+Click [original version](https://checkmyindex.pasteur.fr/) to use the original Pasteur Institute version.
 
 ## Modifications in this fork (made by Cornell Genomics Facility)
 
