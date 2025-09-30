@@ -9,6 +9,16 @@ Search for a set of compatible indices for your sequencing experiment according 
 * the constraint on the indices (none, use each one or each combination only once)
 * the inclusion of any indices that are req to appear in the solution
 
+## Run Shiny application on server
+
+### Private Cornell version (you must be behind Cornell's firewall to access this version)
+
+Click [Cornell version](http://cbsugg02.biohpc.cornell.edu:8025/CMI2/) to use the Cornell shiny interface of *checkMyIndex*.
+
+### Public website for the original Pasteur Institute version
+
+Click [original version](https://checkmyindex.pasteur.fr/) to use the original shiny interface of *checkMyIndex*.
+
 ## Modifications in this fork (made by Cornell Genomics Facility)
 
 * Added XLEAP-SBS chemistry (used by the Illumina NovaSeq X Series and NextSeq 1000/2000)
@@ -28,17 +38,7 @@ The list of available indices are supplied in one, or two, tab delimited text fi
 
 Any other formats or column orders are not valid and will cause the app to error out or generate incorrect results. Examples of both a four column (for use a Unique Dual-Indexing (UDI) context) and a two-column, single index, file are available in this repository (testCheckMyIndex-i7-i5.txt and inputIndexesExample.txt respectively) to test the application. 
 
-## Shiny application
-
-### Private Cornell version (you must be behind Cornell's firewall to access this version)
-
-Click [Cornell version](http://cbsugg02.biohpc.cornell.edu:8025/CMI2/) to use the Cornell shiny interface of *checkMyIndex*.
-
-### Public website for the original Pasteur Institute version
-
-Click [original version](https://checkmyindex.pasteur.fr/) to use the original shiny interface of *checkMyIndex*.
-
-### Locally
+## Run application locally
 
 If both *shiny* and *shinyjs* R packages are already installed, one can use the modified application locally running the two following lines in R:
 
