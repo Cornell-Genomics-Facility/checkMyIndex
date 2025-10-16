@@ -11,7 +11,7 @@ Search for a set of compatible indices for your sequencing experiment according 
 
 ## Run Shiny application on server
 
-Click [Private Cornell version](http://cbsugg02.biohpc.cornell.edu:8025/CMI2/) to use the Cornell shiny interface of *checkMyIndex* (you must be behind Cornell's firewall to access this version)
+Click [Cornell version](http://cbsugg02.biohpc.cornell.edu:8025/CMI2/) to use the Cornell shiny interface of *checkMyIndex*
 
 Click [original version](https://checkmyindex.pasteur.fr/) to use the original Pasteur Institute version.
 
@@ -97,6 +97,7 @@ Illumina has developed four types of chemistry: the four-channel for the HiSeq a
 * Genomics Facility at Cornell version 1.4.3: Automatically stop processing when browser window is closed
 * Genomics Facility at Cornell version 1.4.4: Add a warning message to proposed flowcell design tab if any score in a solution is less than 3
 * Genomics Facility at Cornell version 1.4.5: Bug fix and better error reporting
+* Genomics Facility at Cornell version 1.4.6: Add checks to make sure number of required indices is compatable with the number of samples and pools
 
 ## About checkMyIndex
 

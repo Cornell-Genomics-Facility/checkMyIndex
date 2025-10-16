@@ -478,8 +478,8 @@ shinyServer(function(input, output, session) {
       )
     } else {
       base <- 'Please load indices and then press the "Search for a solution" button.'
-      app_error <- 'The app encountered an error - please let Paul know about it (prm88@cornell.edu). '
-      if (is.null(err_msg)) base else paste0(app_error, "Error: ", err_msg)
+      app_error <- 'The app encountered an error: '
+      if (is.null(err_msg)) base else paste0(app_error, err_msg)
     }
   })
   
@@ -551,7 +551,8 @@ shinyServer(function(input, output, session) {
                                  completeLane = input$completeLane,
                                  selectCompIndexes = input$selectCompIndexes,
                                  chemistry = input$chemistry,
-                                 i7i5pairing = input$i7i5pairing)
+                                 i7i5pairing = input$i7i5pairing,
+                                 selectedRows = selectedRows())
 
         # Calculate the percentage of each character in each position of color1 and color2
         results <- calculate_color_percentages_with_weights(solution)
@@ -733,8 +734,8 @@ shinyServer(function(input, output, session) {
       )
     } else {
       base <- 'Please load indices and then press the "Search for a solution" button.'
-      app_error <- 'The app encountered an error - please let Paul know about it (prm88@cornell.edu). '
-      if (is.null(err_msg)) base else paste0(app_error, "Error: ", err_msg)
+      app_error <- 'The app encountered an error: '
+      if (is.null(err_msg)) base else paste0(app_error, err_msg)
     }
   })
   # output$textDescribingColorBalancing <- renderText({
@@ -789,8 +790,8 @@ shinyServer(function(input, output, session) {
       )
     } else {
       base <- 'Please load indices and then press the "Search for a solution" button.'
-      app_error <- 'The app encountered an error - please let Paul know about it (prm88@cornell.edu). '
-      if (is.null(err_msg)) base else paste0(app_error, "Error: ", err_msg)
+      app_error <- 'The app encountered an error: '
+      if (is.null(err_msg)) base else paste0(app_error, err_msg)
     }
   })
   # output$textDescribingHeatmap <- renderText({

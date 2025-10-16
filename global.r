@@ -8,7 +8,7 @@ library(rlang)
 
 
 checkMyIndexVersion <- "1.0.2"
-cornellCheckMyIndexVersion <- "1.4.5"
+cornellCheckMyIndexVersion <- "1.4.6"
 
 readIndexesFile <- function(file){
   index <- tryCatch({read.table(file, header=FALSE, sep="\t", stringsAsFactors=FALSE, col.names=c("id","sequence"))},
@@ -451,6 +451,323 @@ generateListOfIndexesCombinations <- function(index, nbSamplesPerLane, completeL
   return(indexesCombinations)
 }
 
+
+searchOneSolution_new <- function(indexesList, index, indexesList2 = NULL, index2 = NULL,
+                              nbLanes, multiplexingRate, unicityConstraint, chemistry,
+                              i7i5pairing) {
+
+  # goal: look for a solution (i.e. a combination of combination of indices) such that
+  #  - each index is used only once if required (unicityConstraint = index)
+  #  - each combination of indices is used only once if required (unicityConstraint = lane)
+  # two steps:
+  #  1) fill the lanes with as many samples per lane as in indexesList (may be lower than multiplexingRate for optimization purposes)
+  #  2) if this number is lower than the desired multiplexing rate, complete the solution returned at step 1 adding indices
+  # this function can return NULL if no solution is found (need to re-run in that case)
+  
+  ## ── helpers ─────────────────────────────────────────────────────────
+  # Extract required IDs from indexesList (accepts: list of dfs, single df, or char vector)
+  extract_required_ids <- function(x) {
+    if (is.null(x)) return(character(0))
+    if (is.list(x) && !is.data.frame(x)) {
+      dfs <- Filter(function(d) is.data.frame(d) && "id" %in% names(d), x)
+      if (!length(dfs)) return(character(0))
+      unique(unlist(lapply(dfs, function(d) as.character(d$id))))
+    } else if (is.data.frame(x) && "id" %in% names(x)) {
+      unique(as.character(x$id))
+    } else if (is.character(x)) {
+      unique(x)
+    } else {
+      character(0)
+    }
+  }
+  
+  # Split a vector into nb equally-sized chunks (sizes differ by at most 1)
+  split_even <- function(v, nb) {
+    n <- length(v)
+    if (n == 0) return(replicate(nb, character(0), simplify = FALSE))
+    ord <- sample(seq_len(n))            # randomize to avoid bias
+    q <- n %/% nb; r <- n %% nb
+    sizes <- c(rep(q + 1, r), rep(q, nb - r))
+    out <- vector("list", nb)
+    start <- 1
+    for (k in seq_len(nb)) {
+      if (sizes[k] == 0) out[[k]] <- character(0) else {
+        idx <- ord[start:(start + sizes[k] - 1)]
+        out[[k]] <- v[idx]
+        start <- start + sizes[k]
+      }
+    }
+    out
+  }
+  
+  # Top-up *each* lane to multiplexingRate, honoring unicityConstraint
+  complete_per_lane <- function(partialSolution, index, multiplexingRate, unicityConstraint, nbLanes) {
+    pools <- seq_len(nbLanes)
+    for (l in pools) {
+      have   <- sum(partialSolution$pool == l)
+      nbToAdd <- multiplexingRate - have
+      if (nbToAdd <= 0) next
+      
+      index.remaining <- switch(unicityConstraint,
+                                "index" = index[!(index$id %in% partialSolution$id), , drop = FALSE],
+                                "lane"  = {
+                                  used_lane_ids <- partialSolution$id[partialSolution$pool == l]
+                                  index[!(index$id %in% used_lane_ids), , drop = FALSE]
+                                },
+                                index  # anything else = no uniqueness restriction
+      )
+      
+      if (nbToAdd > nrow(index.remaining)) return(NULL)
+      addRows <- index.remaining[sample(seq_len(nrow(index.remaining)), nbToAdd, replace = FALSE),
+                                 , drop = FALSE]
+      addRows$pool <- l
+      addRows <- addRows[, c("pool", setdiff(names(addRows), "pool")), drop = FALSE]
+      partialSolution <- rbind(partialSolution, addRows)
+    }
+    
+    final <- partialSolution[order(partialSolution$pool, partialSolution$id), , drop = FALSE]
+    data.frame(sample = seq_len(nrow(final)), final, row.names = NULL, check.names = FALSE)
+  }
+  
+  # chemistry filter (drop GG-leading for 2-channel)
+  filter_by_chemistry <- function(df) {
+    if (!nrow(df)) return(df)
+    if (chemistry == "2" && "sequence" %in% names(df))
+      df <- df[!(sapply(df$sequence, substr, 1, 2) == "GG"), , drop = FALSE]
+    if (chemistry == "2" && "sequence2" %in% names(df))
+      df <- df[!(sapply(df$sequence2, substr, 1, 2) == "GG"), , drop = FALSE]
+    df
+  }
+  
+  print('nbLanes: ', nbLanes)
+  print('multiplexingRate: ', multiplexingRate)
+  print('indexesList: ', indexesList[[1]])
+  
+  ## ── branch A: single indexing (or paired-in-one-table) ──────────────
+  if (is.null(index2) || is.null(indexesList2)) {
+    # Required IDs come from indexesList
+    req_ids <- extract_required_ids(indexesList)
+    areOK <- TRUE
+    
+    # master table chemistry filter first (applies to completion pool)
+    index <- filter_by_chemistry(index)
+    
+    if (length(req_ids)) {
+      # sanity: all required IDs must exist in `index`
+      missing <- setdiff(req_ids, as.character(index$id))
+      if (length(missing))
+        stop("Required indices not found in index table: ", paste(missing, collapse = ", "))
+      
+      # 1) spread required across lanes (no ID in more than one lane)
+      chunks <- split_even(req_ids, nbLanes)
+      
+      # 2) build per-lane partial by subsetting `index`
+      partial <- NULL
+      for (k in seq_len(nbLanes)) {
+        lane_ids <- chunks[[k]]
+        lane_df  <- if (length(lane_ids)) index[index$id %in% lane_ids, , drop = FALSE]
+        else                   index[0, , drop = FALSE]
+        if (nrow(lane_df)) {
+          # optional compatibility checks on the required set
+          if (i7i5pairing) {
+            areOK <- areOK &&
+              areIndexesCompatible(lane_df, chemistry, "color") &&
+              areIndexesCompatible(lane_df, chemistry, "color2")
+          } else {
+            areOK <- areOK && areIndexesCompatible(lane_df, chemistry, "color")
+          }
+          lane_df$pool <- k
+          lane_df <- lane_df[, c("pool", setdiff(names(lane_df), "pool")), drop = FALSE]
+          partial <- rbind(partial, lane_df)
+        }
+      }
+      if (is.null(partial)) return(NULL)
+      
+      # 3) complete each lane to the requested multiplexingRate
+      solution <- complete_per_lane(partial, index, multiplexingRate, unicityConstraint, nbLanes)
+      if (is.null(solution)) return(NULL)
+      
+    } else {
+      # Fallback to your original random-pick path when no required IDs are provided
+      inputNbSamplesPerLane <- nrow(indexesList[[1]])
+      compatibleCombinations <- vector(mode = "list", length = nbLanes)
+      k <- 1
+      areIndicesCompatible <- TRUE
+      while (k <= nbLanes) {
+        if (length(indexesList) == 0) return(NULL)
+        i <- sample(seq_along(indexesList), 1, FALSE)
+        if (!i7i5pairing) {
+          if (is.null(areIndicesCompatible) || areIndicesCompatible)
+            areIndicesCompatible <- areIndexesCompatible(indexesList[[i]], chemistry, "color")
+          compatibleCombinations[[k]] <- indexesList[[i]]
+          if (unicityConstraint == "index")
+            indexesList <- indexesList[!sapply(indexesList, function(tab) any(tab$id %in% indexesList[[i]]$id))]
+          if (unicityConstraint == "lane")
+            indexesList <- indexesList[-i]
+          k <- k + 1
+        } else {
+          if (is.null(areIndicesCompatible) || areIndicesCompatible)
+            areIndicesCompatible <- (areIndexesCompatible(indexesList[[i]], chemistry, "color") &
+                                       areIndexesCompatible(indexesList[[i]], chemistry, "color2"))
+          compatibleCombinations[[k]] <- indexesList[[i]]
+          k <- k + 1
+        }
+      }
+      solution <- data.frame(sample = 1:(nbLanes * inputNbSamplesPerLane),
+                             pool   = rep(1:nbLanes, each = inputNbSamplesPerLane),
+                             do.call("rbind", compatibleCombinations))
+      if (multiplexingRate > inputNbSamplesPerLane) {
+        solution <- complete_per_lane(solution, index, multiplexingRate, unicityConstraint, nbLanes)
+        if (is.null(solution)) return(NULL)
+      }
+      areOK <- areIndicesCompatible
+    }
+    
+    # scores / column shape as in your code
+    if (i7i5pairing) {
+      names(solution)[3:6] <- paste0(names(solution)[3:6], "1")
+      solution$score1 <- unlist(tapply(solution$sequence1, solution$pool, scores))
+      solution$score2 <- unlist(tapply(solution$sequence2, solution$pool, scores))
+      solution <- solution[, c("sample", "pool",
+                               "id1", "sequence1", "color1", "score1", "weight1",
+                               "id2", "sequence2", "color2", "score2", "weight2")]
+    } else {
+      solution$score <- unlist(tapply(solution$sequence, solution$pool, scores))
+    }
+    solution$areIndicesCompatible <- areOK
+    return(solution)
+  }
+  
+  ## ── branch B: dual indexing (unpaired i7/i5) ────────────────────────
+  # For your request, we spread the *i7* required IDs (from `indexesList`) evenly by lane.
+  # i5 side (`indexesList2`) remains as in your original logic.
+  
+  # chemistry filter on both master tables
+  if (chemistry == "2") {
+    index  <- index [!(sapply(index$sequence,  substr, 1, 2) == "GG"), , drop = FALSE]
+    index2 <- index2[!(sapply(index2$sequence, substr, 1, 2) == "GG"), , drop = FALSE]
+  }
+  
+  areOK <- TRUE
+  
+  ## i7 (first side): spread required IDs if provided
+  req_ids1 <- extract_required_ids(indexesList)
+  comp1 <- vector("list", nbLanes)
+  if (length(req_ids1)) {
+    missing <- setdiff(req_ids1, as.character(index$id))
+    if (length(missing))
+      stop("Required i7 indices not found in index table: ", paste(missing, collapse = ", "))
+    chunks1 <- split_even(req_ids1, nbLanes)
+    for (k in seq_len(nbLanes)) {
+      lane_ids <- chunks1[[k]]
+      dfk <- if (length(lane_ids)) index[index$id %in% lane_ids, , drop = FALSE]
+      else                   index[0, , drop = FALSE]
+      areOK <- areOK && areIndexesCompatible(dfk, chemistry)
+      comp1[[k]] <- dfk
+    }
+  } else {
+    # original fallback for i7
+    inputNbSamplesPerLane  <- nrow(indexesList[[1]])
+    k <- 1
+    while (k <= nbLanes) {
+      if (length(indexesList) == 0) return(NULL)
+      i <- sample(seq_along(indexesList), 1, FALSE)
+      areOK <- areOK && areIndexesCompatible(indexesList[[i]], chemistry)
+      comp1[[k]] <- indexesList[[i]]
+      k <- k + 1
+    }
+  }
+  
+  ## i5 (second side): keep your original approach
+  inputNbSamplesPerLane2 <- nrow(indexesList2[[1]])
+  comp2 <- vector("list", nbLanes)
+  k <- 1
+  while (k <= nbLanes) {
+    if (length(indexesList2) == 0) return(NULL)
+    i2 <- ifelse(i7i5pairing, k, sample(seq_along(indexesList2), 1, FALSE)) # pairing idx if needed
+    areOK <- areOK && areIndexesCompatible(indexesList2[[i2]], chemistry)
+    comp2[[k]] <- indexesList2[[i2]]
+    k <- k + 1
+  }
+  
+  # Assemble partials with pool tags
+  partial1 <- do.call(rbind, lapply(seq_len(nbLanes), function(k) {
+    blk <- comp1[[k]]
+    if (nrow(blk)) { blk$pool <- k; blk <- blk[, c("pool", setdiff(names(blk), "pool")), drop = FALSE] }
+    blk
+  }))
+  partial2 <- do.call(rbind, lapply(seq_len(nbLanes), function(k) {
+    blk <- comp2[[k]]
+    if (nrow(blk)) { blk$pool <- k; blk <- blk[, c("pool", setdiff(names(blk), "pool")), drop = FALSE] }
+    blk
+  }))
+  
+  if (is.null(partial1) || is.null(partial2)) return(NULL)
+  
+  # top-up each side per-lane (no averaging)
+  desired1 <- min(multiplexingRate, nrow(index))
+  desired2 <- min(multiplexingRate, nrow(index2))
+  sol1 <- complete_per_lane(partial1, index,  desired1, unicityConstraint = "none", nbLanes = nbLanes)
+  if (is.null(sol1)) return(NULL)
+  sol2 <- complete_per_lane(partial2, index2, desired2, unicityConstraint = "none", nbLanes = nbLanes)
+  if (is.null(sol2)) return(NULL)
+  
+  # merge and select balanced pairs (your original logic)
+  names(sol1) <- paste0(names(sol1), "1")
+  names(sol2) <- paste0(names(sol2), "2")
+  solution.merged <- merge(sol1, sol2, by.x = "pool1", by.y = "pool2")
+  
+  solution <- list()
+  for (pool in unique(solution.merged$pool1)) {
+    solution.pool.OK <- FALSE
+    while (!solution.pool.OK) {
+      pool_df <- solution.merged[solution.merged$pool1 == pool, , drop = FALSE]
+      counts.id1 <- numeric(length(unique(pool_df$id1))); names(counts.id1) <- unique(pool_df$id1)
+      counts.id2 <- numeric(length(unique(pool_df$id2))); names(counts.id2) <- unique(pool_df$id2)
+      tmp <- NULL
+      for (i in 1:multiplexingRate) {
+        for (k in sample(seq_len(nrow(pool_df)), nrow(pool_df), FALSE)) {
+          c1k <- counts.id1 + as.numeric(names(counts.id1) == pool_df[k, "id1"])
+          c2k <- counts.id2 + as.numeric(names(counts.id2) == pool_df[k, "id2"])
+          maxdiff <- function(x) max(x) - min(x)
+          if (maxdiff(c1k) <= 1 & maxdiff(c2k) <= 1) {
+            counts.id1 <- c1k; counts.id2 <- c2k
+            tmp <- rbind(tmp, pool_df[k, , drop = FALSE])
+            pool_df <- pool_df[-k, , drop = FALSE]
+            break
+          }
+        }
+      }
+      if (!is.null(tmp) && nrow(tmp) == multiplexingRate) solution.pool.OK <- TRUE
+    }
+    solution[[pool]] <- tmp
+  }
+  
+  solution <- do.call("rbind", solution)
+  solution <- solution[order(solution$pool1, solution$id1, solution$id2), , drop = FALSE]
+  
+  solution$score1 <- unlist(tapply(solution$sequence1, solution$pool1, scores))
+  solution$score2 <- unlist(tapply(solution$sequence2, solution$pool1, scores))
+  solution <- data.frame(
+    sample    = 1:(nbLanes * multiplexingRate),
+    pool      = solution$pool1,
+    id1       = solution$id1,
+    sequence1 = solution$sequence1,
+    color1    = solution$color1,
+    score1    = solution$score1,
+    weight1   = solution$weight1,
+    id2       = solution$id2,
+    sequence2 = solution$sequence2,
+    color2    = solution$color2,
+    score2    = solution$score2,
+    weight2   = solution$weight2,
+    stringsAsFactors = FALSE
+  )
+  solution$areIndicesCompatible <- areOK
+  return(solution)
+}
+
+
 searchOneSolution <- function(indexesList, index, indexesList2=NULL, index2=NULL,
                               nbLanes, multiplexingRate, unicityConstraint, chemistry,
                               i7i5pairing){
@@ -471,6 +788,19 @@ searchOneSolution <- function(indexesList, index, indexesList2=NULL, index2=NULL
   if (is.null(index2) | is.null(indexesList2)){
     k <- 1
     # print(paste0('nbLanes: ', nbLanes))
+    
+    print('single-indexing or paired dual-indexing')
+    print(paste0('nbLanes: ', nbLanes))
+    print(paste0('multiplexingRate: ', multiplexingRate))
+    print(paste0('inputNbSamplesPerLane: ', inputNbSamplesPerLane))
+    print(paste0('length(indexesList): ', length(indexesList)))
+    # print(paste0('indexesList$id[[1]]: ', indexesList[[1]]$id))
+    # print('indexesList$id:')
+    # for (i in seq_along(indexesList)) {
+    #   print(paste0('i: ', i, 'indexesList[[i]]$id: ', indexesList[[i]]$id))
+    #   # cat(indexesList[[i]]$id, sep = ", ")
+    # }
+    
     while (k <= nbLanes){
       
       #  print(paste0('compatibleCombinations: ', compatibleCombinations))
@@ -479,6 +809,10 @@ searchOneSolution <- function(indexesList, index, indexesList2=NULL, index2=NULL
         return(NULL)
       } else{
         i <- sample(1:length(indexesList), 1, FALSE)
+        
+        print('')
+        print(paste0('i: ', i, ', indexesList$id[[i]]: ', indexesList[[i]]$id))
+        
         if (!i7i5pairing){
           # if (areIndexesCompatible(indexesList[[i]], chemistry, "color")){
           # areIndicesCompatible <- areIndexesCompatible(indexesList[[i]], chemistry, "color")
@@ -571,6 +905,11 @@ searchOneSolution <- function(indexesList, index, indexesList2=NULL, index2=NULL
     # print('Second while loop: ')  # //--- comment me out
     # print(paste0('nbLanes: ', nbLanes))  # //--- comment me out
     
+    print(paste0('nbLanes: ', nbLanes))
+    print(paste0('multiplexingRate: ', multiplexingRate))
+    print(paste0('inputNbSamplesPerLane2: ', inputNbSamplesPerLane2))
+    print(paste0('indexesList2[[1]]: ', indexesList2[[1]]))
+    
     while (k <= nbLanes){
       # print(paste0("Start of while loop, k: ", k))
       # print(paste0("length(indexesList) in global.r: ", length(indexesList)))
@@ -581,6 +920,10 @@ searchOneSolution <- function(indexesList, index, indexesList2=NULL, index2=NULL
       } else{
         i <- sample(1:length(indexesList), 1, FALSE)
         i2 <- ifelse(i7i5pairing, i, sample(1:length(indexesList2), 1, FALSE))
+
+        print(paste0('indexesList[[i]]: ', indexesList[[i]]))
+        print(paste0('indexesList2[[i2]]: ', indexesList2[[i2]]))
+        
         # if (areIndexesCompatible(indexesList[[i]], chemistry)){
         # areIndexesCompatible <- ((areIndexesCompatible(indexesList[[i]], chemistry)) & (areIndexesCompatible(indexesList2[[i2]], chemistry)))
         # print('Before is.null(areIndicesCompatible')  # //--- comment me out
@@ -758,7 +1101,7 @@ calculateSolutionScore <- function(solution, chemistry, percentage_threshold, di
 
 findSolution <- function(indexesList, index, indexesList2=NULL, index2=NULL,
                          nbSamples, multiplexingRate, unicityConstraint, nbMaxTrials, 
-                         completeLane, selectCompIndexes, chemistry, i7i5pairing){
+                         completeLane, selectCompIndexes, chemistry, i7i5pairing, selectedRows){
 
   percentage_threshold <- 25
   distance_threshold <- 3
@@ -773,6 +1116,13 @@ findSolution <- function(indexesList, index, indexesList2=NULL, index2=NULL,
     stop("There are only ", length(indexesList), " combinations of compatible indices to fill ", nbLanes, " lanes.")
   }
   
+  # Stop if there are required rows, but we have more than one pool
+  # stop("selectedRows: ", nrow(selectedRows), ", nbSamples: ", nbSamples, ", multiplexingRate: ", multiplexingRate)
+  if (nrow(selectedRows) > 0 & nbSamples != multiplexingRate) stop("You cannot select required indices if you have more than one pool (i.e. number of samples must equal the multiplexing rate).")
+  
+  # Stop if the number of required rows is greater than the number of samples
+  if (nrow(selectedRows) > nbSamples) stop("The number of required indices cannot be greater than the number of samples.")
+
   # Initialize an empty list to store solutions and their scores
   solutions_list <- list()
   last_non_null_solution <- NULL  # Track the last non-null solution
@@ -907,7 +1257,9 @@ checkProposedSolution <- function(solution, unicityConstraint, chemistry){
     stop("The solution proposed uses some indices several times.")
   }
   # indices not unique within a pool/lane
+  # print(paste0('split(solution$id, solution$pool): ', split(solution$id, solution$pool)))  # //---delete me after testing
   if (any(sapply(split(solution$id, solution$pool), function(x) any(duplicated(x))))){
+    stop(paste0('split(solution$id, solution$pool): ', split(solution$id, solution$pool)))
     stop("The solution proposed uses some indices several times within a lane.")
   }
   # several pools/lanes with the same combination of indices
@@ -938,9 +1290,10 @@ checkProposedSolution <- function(solution, unicityConstraint, chemistry){
 # dual-indexing solution checking
 checkProposedSolution2 <- function(solution, chemistry){
   # indices not unique within a pool/lane
-  if (any(sapply(split(paste(solution$id1, solution$id2, sep="-"), solution$pool), function(x) any(duplicated(x))))){
-    stop("The solution proposed uses some dual-index combinations several times within a lane.")
-  }
+  # if (any(sapply(split(paste(solution$id1, solution$id2, sep="-"), solution$pool), function(x) any(duplicated(x))))){                                       # //--- comment me back in
+  #   stop(paste0('split(paste(solution$id1, solution$id2, sep="-"), solution$pool): ', split(paste(solution$id1, solution$id2, sep="-"), solution$pool)))    # //--- comment me back in
+  #   stop("The solution proposed uses some dual-index combinations several times within a lane.")                                                            # //--- comment me back in
+  # }
   # different number of samples on the pools/lanes
   if (length(table(table(solution$pool))) > 1){
     stop("The solution proposed uses different numbers of samples per lane.")
