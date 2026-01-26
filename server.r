@@ -164,6 +164,14 @@ shinyServer(function(input, output, session) {
     return(inputIndexes()$index2)
   })
   
+  # ---- Helper reactive: TRUE when pairing is visible AND checked ----
+  pairingActive <- reactive({
+    !is.null(inputIndex()) &&
+      !is.null(inputIndex2()) &&
+      nrow(inputIndex()) == nrow(inputIndex2()) &&
+      isTRUE(input$i7i5pairing)
+  })
+  
   output$indexUploaded <- reactive({!is.null(inputIndex())})
   outputOptions(output, "indexUploaded", suspendWhenHidden=FALSE)
   
@@ -546,14 +554,28 @@ shinyServer(function(input, output, session) {
                                  index2 = index2,
                                  nbSamples = as.numeric(input$nbSamples),
                                  multiplexingRate = as.numeric(input$multiplexingRate),
-                                 unicityConstraint = ifelse(is.null(inputIndex2()), input$unicityConstraint, "none"),
+                                 unicityConstraint = ifelse(is.null(inputIndex2()) || pairingActive(), input$unicityConstraint, "none"),
                                  nbMaxTrials = as.numeric(input$nbMaxTrials),
                                  completeLane = input$completeLane,
                                  selectCompIndexes = input$selectCompIndexes,
                                  chemistry = input$chemistry,
                                  i7i5pairing = input$i7i5pairing,
                                  selectedRows = selectedRows())
-
+        
+        # solution <- findSolution(indexesList = indexesList,
+        #                          index = index,
+        #                          indexesList2 = indexesList2,
+        #                          index2 = index2,
+        #                          nbSamples = as.numeric(input$nbSamples),
+        #                          multiplexingRate = as.numeric(input$multiplexingRate),
+        #                          unicityConstraint = ifelse(is.null(inputIndex2()), input$unicityConstraint, "none"),
+        #                          nbMaxTrials = as.numeric(input$nbMaxTrials),
+        #                          completeLane = input$completeLane,
+        #                          selectCompIndexes = input$selectCompIndexes,
+        #                          chemistry = input$chemistry,
+        #                          i7i5pairing = input$i7i5pairing,
+        #                          selectedRows = selectedRows())
+        
         # Calculate the percentage of each character in each position of color1 and color2
         results <- calculate_color_percentages_with_weights(solution)
         solution_color_percentages_with_weights <- results$solution_color_percentages

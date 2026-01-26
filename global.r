@@ -8,7 +8,7 @@ library(rlang)
 
 
 checkMyIndexVersion <- "1.0.2"
-cornellCheckMyIndexVersion <- "1.4.6"
+cornellCheckMyIndexVersion <- "1.4.7"
 
 readIndexesFile <- function(file){
   index <- tryCatch({read.table(file, header=FALSE, sep="\t", stringsAsFactors=FALSE, col.names=c("id","sequence"))},
@@ -502,6 +502,7 @@ searchOneSolution_new <- function(indexesList, index, indexesList2 = NULL, index
   
   # Top-up *each* lane to multiplexingRate, honoring unicityConstraint
   complete_per_lane <- function(partialSolution, index, multiplexingRate, unicityConstraint, nbLanes) {
+    
     pools <- seq_len(nbLanes)
     for (l in pools) {
       have   <- sum(partialSolution$pool == l)
@@ -516,6 +517,10 @@ searchOneSolution_new <- function(indexesList, index, indexesList2 = NULL, index
                                 },
                                 index  # anything else = no uniqueness restriction
       )
+      
+      print(paste0('Pool: ', l))
+      print(paste0('partialSolution: ', partialSolution))
+      print(paste0('index.remaining: ', index.remaining))
       
       if (nbToAdd > nrow(index.remaining)) return(NULL)
       addRows <- index.remaining[sample(seq_len(nrow(index.remaining)), nbToAdd, replace = FALSE),
@@ -539,9 +544,11 @@ searchOneSolution_new <- function(indexesList, index, indexesList2 = NULL, index
     df
   }
   
-  print('nbLanes: ', nbLanes)
-  print('multiplexingRate: ', multiplexingRate)
-  print('indexesList: ', indexesList[[1]])
+  print('single-indexing or paired dual-indexing - new version')
+  
+  inputNbSamplesPerLane <- nrow(indexesList[[1]])
+  compatibleCombinations <- vector(mode="list", length=nbLanes)
+  areIndicesCompatible <- TRUE
   
   ## ── branch A: single indexing (or paired-in-one-table) ──────────────
   if (is.null(index2) || is.null(indexesList2)) {
@@ -549,7 +556,12 @@ searchOneSolution_new <- function(indexesList, index, indexesList2 = NULL, index
     req_ids <- extract_required_ids(indexesList)
     areOK <- TRUE
     
-    # master table chemistry filter first (applies to completion pool)
+    print(paste0('nbLanes: ', nbLanes))
+    print(paste0('multiplexingRate: ', multiplexingRate))
+    print(paste0('inputNbSamplesPerLane: ', inputNbSamplesPerLane))
+    print(paste0('length(indexesList): ', length(indexesList)))
+
+        # master table chemistry filter first (applies to completion pool)
     index <- filter_by_chemistry(index)
     
     if (length(req_ids)) {
@@ -589,6 +601,7 @@ searchOneSolution_new <- function(indexesList, index, indexesList2 = NULL, index
       
     } else {
       # Fallback to your original random-pick path when no required IDs are provided
+      
       inputNbSamplesPerLane <- nrow(indexesList[[1]])
       compatibleCombinations <- vector(mode = "list", length = nbLanes)
       k <- 1
@@ -782,14 +795,13 @@ searchOneSolution <- function(indexesList, index, indexesList2=NULL, index2=NULL
   compatibleCombinations <- vector(mode="list", length=nbLanes)
   areIndicesCompatible <- TRUE
   
-  # print('Got to searchOneSolution')  # //--- comment me out
-  
   # single-indexing or paired dual-indexing
   if (is.null(index2) | is.null(indexesList2)){
     k <- 1
     # print(paste0('nbLanes: ', nbLanes))
     
-    print('single-indexing or paired dual-indexing')
+    print('single-indexing or paired dual-indexing - original version')
+    print(paste0('unicityConstraint: ', unicityConstraint))
     print(paste0('nbLanes: ', nbLanes))
     print(paste0('multiplexingRate: ', multiplexingRate))
     print(paste0('inputNbSamplesPerLane: ', inputNbSamplesPerLane))
@@ -813,42 +825,53 @@ searchOneSolution <- function(indexesList, index, indexesList2=NULL, index2=NULL
         print('')
         print(paste0('i: ', i, ', indexesList$id[[i]]: ', indexesList[[i]]$id))
         
-        if (!i7i5pairing){
-          # if (areIndexesCompatible(indexesList[[i]], chemistry, "color")){
-          # areIndicesCompatible <- areIndexesCompatible(indexesList[[i]], chemistry, "color")
-          # print(paste0('areIndicesCompatible before: ', areIndexesCompatible(indexesList[[i]], chemistry, "color")))
-          # print('Came from searchOneSolution1')
-          if (is.null(areIndicesCompatible) || areIndicesCompatible) {
-            areIndicesCompatible <- areIndexesCompatible(indexesList[[i]], chemistry, "color")
-          }
-          # print(paste0('areIndicesCompatible: ', areIndicesCompatible))
-          compatibleCombinations[[k]] <- indexesList[[i]]
-          # remove either the combination used or all the combinations for which an index has already been selected
-          if (unicityConstraint=="index") indexesList <- indexesList[!sapply(indexesList, function(tab) any(tab$id %in% indexesList[[i]]$id))]
-          if (unicityConstraint=="lane") indexesList <- indexesList[-i]
-          k <- k+1
-          # } else{
-          #   indexesList <- indexesList[-i]
-          # }
-        } else{
-          # if (areIndexesCompatible(indexesList[[i]], chemistry, "color") & areIndexesCompatible(indexesList[[i]], chemistry, "color2")){
-          # areIndicesCompatible <- (areIndexesCompatible(indexesList[[i]], chemistry, "color") & areIndexesCompatible(indexesList[[i]], chemistry, "color2"))
-          # print(paste0('areIndicesCompatible before: ', (areIndexesCompatible(indexesList[[i]], chemistry, "color") & areIndexesCompatible(indexesList[[i]], chemistry, "color2"))))
-          # print('Came from searchOneSolution2')
-          # print(paste0('i: ', i))
-          # print(paste0('indexesList[[i]]: ', indexesList[[i]]))
-          if (is.null(areIndicesCompatible) || areIndicesCompatible) {
-            areIndicesCompatible <- (areIndexesCompatible(indexesList[[i]], chemistry, "color") & areIndexesCompatible(indexesList[[i]], chemistry, "color2"))
-          }
-          # print(paste0('areIndicesCompatible: ', areIndicesCompatible))
-          compatibleCombinations[[k]] <- indexesList[[i]]
-          k <- k+1
-          # } else{
-          #   indexesList <- indexesList[-i]
-          # }
+        # This replaces the if else block below, since we now want to do the same thing regardless of the unicityConstraint value
+        if (is.null(areIndicesCompatible) || areIndicesCompatible) {
+          areIndicesCompatible <- areIndexesCompatible(indexesList[[i]], chemistry, "color")
         }
+        # print(paste0('areIndicesCompatible: ', areIndicesCompatible))
+        compatibleCombinations[[k]] <- indexesList[[i]]
+        # remove either the combination used or all the combinations for which an index has already been selected
+        if (unicityConstraint=="index") indexesList <- indexesList[!sapply(indexesList, function(tab) any(tab$id %in% indexesList[[i]]$id))]
+        if (unicityConstraint=="lane") indexesList <- indexesList[-i]
+        k <- k+1
+        
+        # if (!i7i5pairing){
+        #   # if (areIndexesCompatible(indexesList[[i]], chemistry, "color")){
+        #   # areIndicesCompatible <- areIndexesCompatible(indexesList[[i]], chemistry, "color")
+        #   # print(paste0('areIndicesCompatible before: ', areIndexesCompatible(indexesList[[i]], chemistry, "color")))
+        #   # print('Came from searchOneSolution1')
+        #   if (is.null(areIndicesCompatible) || areIndicesCompatible) {
+        #     areIndicesCompatible <- areIndexesCompatible(indexesList[[i]], chemistry, "color")
+        #   }
+        #   # print(paste0('areIndicesCompatible: ', areIndicesCompatible))
+        #   compatibleCombinations[[k]] <- indexesList[[i]]
+        #   # remove either the combination used or all the combinations for which an index has already been selected
+        #   if (unicityConstraint=="index") indexesList <- indexesList[!sapply(indexesList, function(tab) any(tab$id %in% indexesList[[i]]$id))]
+        #   if (unicityConstraint=="lane") indexesList <- indexesList[-i]
+        #   k <- k+1
+        #   # } else{
+        #   #   indexesList <- indexesList[-i]
+        #   # }
+        # } else{
+        #   # if (areIndexesCompatible(indexesList[[i]], chemistry, "color") & areIndexesCompatible(indexesList[[i]], chemistry, "color2")){
+        #   # areIndicesCompatible <- (areIndexesCompatible(indexesList[[i]], chemistry, "color") & areIndexesCompatible(indexesList[[i]], chemistry, "color2"))
+        #   # print(paste0('areIndicesCompatible before: ', (areIndexesCompatible(indexesList[[i]], chemistry, "color") & areIndexesCompatible(indexesList[[i]], chemistry, "color2"))))
+        #   # print('Came from searchOneSolution2')
+        #   # print(paste0('i: ', i))
+        #   # print(paste0('indexesList[[i]]: ', indexesList[[i]]))
+        #   if (is.null(areIndicesCompatible) || areIndicesCompatible) {
+        #     areIndicesCompatible <- (areIndexesCompatible(indexesList[[i]], chemistry, "color") & areIndexesCompatible(indexesList[[i]], chemistry, "color2"))
+        #   }
+        #   # print(paste0('areIndicesCompatible: ', areIndicesCompatible))
+        #   compatibleCombinations[[k]] <- indexesList[[i]]
+        #   # remove either the combination used or all the combinations for which an index has already been selected
+        #   k <- k+1
+        #   # } else{
+        #   #   indexesList <- indexesList[-i]
+        #   # }
+        # }
       }
-      
     }
     
     solution <- data.frame(sample=1:(nbLanes*inputNbSamplesPerLane), 
