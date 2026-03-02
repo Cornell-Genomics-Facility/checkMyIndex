@@ -99,6 +99,7 @@ Illumina has developed four types of chemistry: the four-channel for the HiSeq a
 * Genomics Facility at Cornell version 1.4.5: Bug fix and better error reporting
 * Genomics Facility at Cornell version 1.4.6: Add checks to make sure number of required indices is compatable with the number of samples and pools
 * Genomics Facility at Cornell version 1.4.7: Expand the use of the uniqueness constraint so that paired indices can be made unique
+* Genomics Facility at Cornell version 1.5.0: Modifications to include MiSeq i100 XLEAP-SBS chemistry
 
 ## About checkMyIndex
 

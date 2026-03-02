@@ -117,11 +117,19 @@ shinyServer(function(input, output, session) {
     # return(index)
     
     if (!is.null(result$index2)) {
-      # Case with four columns
-      index <- addColors(result$index, input$chemistry)
-      index$score <- scores(index$sequence)
-      index2 <- addColors(result$index2, input$chemistry)
-      index2$score <- scores(index2$sequence)
+      if (!is.null(result$index2)) {
+        # Case with combined i7+i5 in one file (4 columns)
+        index <- addColors(result$index, input$chemistry)
+        index$score <- scores(index$sequence)
+        
+        # Reverse-complement i5 if checkbox checked
+        if (isTRUE(input$revCompI5)) {
+          result$index2$sequence <- revcomp(result$index2$sequence)
+        }
+        
+        index2 <- addColors(result$index2, input$chemistry)
+        index2$score <- scores(index2$sequence)
+      }
     } else {
       # Case with two columns
       index <- addColors(result$index, input$chemistry)
@@ -147,6 +155,12 @@ shinyServer(function(input, output, session) {
             }
           )
           index2 <- result$index
+          
+          # Reverse-complement i5 if checkbox checked 
+          if (isTRUE(input$revCompI5)) {
+            index2$sequence <- revcomp(index2$sequence)
+          }
+          
           index2 <- addColors(index2, input$chemistry)
           index2$score <- scores(index2$sequence)
         }
@@ -174,6 +188,13 @@ shinyServer(function(input, output, session) {
   
   output$indexUploaded <- reactive({!is.null(inputIndex())})
   outputOptions(output, "indexUploaded", suspendWhenHidden=FALSE)
+  
+  # Reverse-compliment helper function
+  revcomp <- function(x) {
+    x <- toupper(x)
+    x <- chartr("ACGT", "TGCA", x)                 # complement
+    sapply(strsplit(x, ""), function(v) paste(rev(v), collapse = ""))  # reverse
+  }
   
   # --------------------------------------------------------------------
   # 1) Show the table with multi-row selection enabled
@@ -338,6 +359,15 @@ shinyServer(function(input, output, session) {
       return(out)
     }
   }, options=list(paging=FALSE, searching=FALSE, info=FALSE))
+  
+  # UI output for the "reverse-compliment" checkbox
+  output$revCompI5 <- renderUI({
+    checkboxInput(
+      "revCompI5",
+      "Use reverse compliment of i5 index",
+      value = FALSE
+    )
+  })
   
   # propose both the possible nb samples and multiplexing rates according to the input list of indices
   output$nbSamples <- renderUI({

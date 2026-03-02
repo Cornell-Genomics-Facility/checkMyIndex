@@ -46,9 +46,11 @@ shinyUI(fluidPage(theme = "bootstrap.min.css", shinyjs::useShinyjs(),
                       selectizeInput("chemistry", label="Illumina chemistry", 
                                      choices=c("Four-channels (HiSeq & MiSeq)" = 4, 
                                                "Two-channels (original SBS)" = 2,
-                                               "Two-channels (XLEAP-SBS)" = "X",
+                                               "Two-channels (NovaSeq X XLEAP-SBS)" = "X",
+                                               "Two-channels (MiSeq i100 XLEAP-SBS)" = "M",
                                                "One-channel (iSeq 100)" = 1)),
                       conditionalPanel(condition="output.i7i5sameLength", {uiOutput("i7i5pairing")}),
+                      conditionalPanel(condition="output.indexUploaded2", { uiOutput("revCompI5") }),
                       conditionalPanel(condition="output.indexUploaded", {uiOutput("nbSamples")}),
                       conditionalPanel(condition="output.indexUploaded", {uiOutput("multiplexingRate")}),
                       conditionalPanel(condition="!output.indexUploaded2 || (output.i7i5sameLength && input.i7i5pairing)", {selectInput("unicityConstraint", label="Constraint on the indices (single-indexing only)", 
@@ -166,13 +168,14 @@ shinyUI(fluidPage(theme = "bootstrap.min.css", shinyjs::useShinyjs(),
                                     the computational time."),
                                  
                                  h3("Background on Illumina chemistry and color balancing"),
-                                 p(strong("Illumina chemistry"), "can be either four-channels (HiSeq & MiSeq), two-channels (original SBS and XLEAP-SBS) or one-channel (iSeq 100).
+                                 p(strong("Illumina chemistry"), "can be either four-channels (HiSeq & MiSeq), two-channels (original SBS, NovaSeq X XLEAP-SBS, and MiSeq i100 XLEAP-SBS) or one-channel (iSeq 100).
                                    With the four-channel chemistry, a red laser detects A/C bases and a green laser detects G/T bases and the indices are compatible if there is at 
                                    least one red light and one green light at each position. With the two-channel chemistry (original SBS), G bases have no color, A bases are 
-                                   orange, C bases are red and T bases are green and indices are compatible if there is at least one color at each position. For two-channel XLEAP-SBS chemistry, 
-                                   G bases have no color, A bases are blue, C bases are Blue+Green (Cyan) and T bases are green and indices are compatible if there is at least one color at each 
-                                   position. Note that indices starting with GG are not compatible with the two-channel chemistry. With the one-channel chemistry, compatibility cannot be 
-                                   defined with colors and indices are compatible if there is at least one A or C or T base at each position. Please refer to the Illumina documentation for more 
+                                   orange, C bases are red and T bases are green and indices are compatible if there is at least one color at each position. For two-channel NovaSeq X XLEAP-SBS chemistry, 
+                                   G bases have no color, A bases are blue, C bases are blue+green (cyan) and T bases are green and indices are compatible if there is at least one color at each 
+                                   position. For two-channel MiSeq i100 XLEAP-SBS chemistry, G bases have no color, A bases are blue+green (cyan), C bases are blue and T bases are green and indices are compatible 
+                                   if there is at least one color at each position. Note that indices starting with GG are not compatible with the two-channel chemistry. With the one-channel chemistry, compatibility 
+                                   cannot be defined with colors and indices are compatible if there is at least one A or C or T base at each position. Please refer to the Illumina documentation for more 
                                    detailed information on the different chemistries."),
 
                                  h3("About"),
