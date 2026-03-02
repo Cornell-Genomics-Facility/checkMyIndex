@@ -17,7 +17,7 @@ Click [original version](https://checkmyindex.pasteur.fr/) to use the original P
 
 ## Modifications in this fork (made by Cornell Genomics Facility)
 
-* Added XLEAP-SBS chemistry (used by the Illumina NovaSeq X Series and NextSeq 1000/2000)
+* Added XLEAP-SBS chemistry (used by the Illumina NovaSeq X Series, NextSeq 1000/2000, and MiSeq i100)
 * Added color balancing tab to show the respective percentages for each of the red, green, and blue colors at each position
 * Added ability to rank solutions and return the best one from a given number of trials
 * Modifications to enable selection of required indices (within a larger set of indices) and find the best solution that includes those required indices
@@ -80,7 +80,7 @@ One can install each of these packages running `install.packages(packageName)` i
 
 ## Illumina chemistry
 
-Illumina has developed four types of chemistry: the four-channel for the HiSeq and MiSeq sequencing devices, the two-channel original SBS and two-channel XLEAP-SBS for the NovaSeq, NextSeq and MiniSeq devices and the one-channel for the iSeq 100 device. With the four-channel chemistry, a red laser detects A/C bases and a green laser detects G/T bases and the indices are compatible if there is at least one red light and one green light at each position. With the two-channel original SBS chemistry, G bases have no color, A bases are orange, C bases are red and T bases are green and indices are compatible if there is at least one color at each position. With the two-channel XLEAP-SBS chemistry, G bases have no color, A bases are blue, C bases are Blue+Green (Cyan) and T bases are green and indices are compatible if there is at least one color at each position. Note that indices starting with GG are not compatible with the two-channel chemistry. With the one-channel chemistry, compatibility cannot be defined with colors and indices are compatible if there is at least one A or C or T base at each position. Please refer to the Illumina documentation for more detailed information on the different chemistries.
+Illumina has developed five types of chemistry: the four-channel for the HiSeq and MiSeq sequencing devices, the two-channel original SBS, two-channel XLEAP-SBS for the NovaSeq and NextSeq devices, the two-channel XLEAP-SBS for the MiSeq i100 device, and the one-channel for the iSeq 100 device. With the four-channel chemistry, a red laser detects A/C bases and a green laser detects G/T bases and the indices are compatible if there is at least one red light and one green light at each position. With the two-channel original SBS chemistry, G bases have no color, A bases are orange, C bases are red and T bases are green and indices are compatible if there is at least one color at each position. With the two-channel XLEAP-SBS chemistry for NovaSeq and NextSeq, G bases have no color, A bases are blue, C bases are blue+green (cyan) and T bases are green and indices are compatible if there is at least one color at each position. With the two-channel XLEAP-SBS chemistry for MiSeq i100, G bases have no color, A bases are blue+green (cyan), C bases are blue and T bases are green and indices are compatible if there is at least one color at each position. Note that indices starting with GG are not compatible with the two-channel chemistry. With the one-channel chemistry, compatibility cannot be defined with colors and indices are compatible if there is at least one A or C or T base at each position. Please refer to the Illumina documentation for more detailed information on the different chemistries.
 
 ## Updates
 
@@ -99,7 +99,7 @@ Illumina has developed four types of chemistry: the four-channel for the HiSeq a
 * Genomics Facility at Cornell version 1.4.5: Bug fix and better error reporting
 * Genomics Facility at Cornell version 1.4.6: Add checks to make sure number of required indices is compatable with the number of samples and pools
 * Genomics Facility at Cornell version 1.4.7: Expand the use of the uniqueness constraint so that paired indices can be made unique
-* Genomics Facility at Cornell version 1.5.0: Modifications to include MiSeq i100 XLEAP-SBS chemistry
+* Genomics Facility at Cornell version 1.5.0: Modifications to include MiSeq i100 XLEAP-SBS chemistry and reverse-compliment functionality
 
 ## About checkMyIndex
 
