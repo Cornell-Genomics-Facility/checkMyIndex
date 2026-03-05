@@ -8,7 +8,7 @@ library(rlang)
 
 
 checkMyIndexVersion <- "1.0.2"
-cornellCheckMyIndexVersion <- "1.4.7"
+cornellCheckMyIndexVersion <- "1.5.0"
 
 readIndexesFile <- function(file){
   index <- tryCatch({read.table(file, header=FALSE, sep="\t", stringsAsFactors=FALSE, col.names=c("id","sequence"))},
@@ -179,6 +179,10 @@ addColors <- function(index, chemistry){
     # G has no color, A is blue, C is Blue+Green (Cyan) and T is green
     index$color <- gsub("T", "G", gsub("C", "C", gsub("A", "B", gsub("G", "-", index$sequence))))
   }
+  if (chemistry == "M"){
+    # G has no color, A is Blue+Green (Cyan), C is blue and T is green
+    index$color <- gsub("T", "G", gsub("A", "C", gsub("C", "B", gsub("G", "-", index$sequence))))
+  }
   if (chemistry == "4"){
     # A/C are red and G/T are green
     index$color <- gsub("G|T", "G", gsub("A|C", "R", index$sequence))
@@ -194,6 +198,7 @@ addColors <- function(index, chemistry){
   # print('addColors')
   # print(paste0('chemistry: ', chemistry))
   # print(paste0('index$color: ', index$color))
+  
   return(index)
 }
 
@@ -267,6 +272,35 @@ areIndexesCompatible <- function(index, chemistry, column="color"){
     return(all(sumRed >= 1 & sumGreen >= 1))
   }
   
+  if (chemistry == "M"){
+    # Count colors for each position
+    sumBlue <- apply(matColors, 2, function(x) sum(x=="B" | x=="C"))  # Count both B and C as blue 
+    sumGreen <- apply(matColors, 2, function(x) sum(x=="G" | x=="C")) # Count both G and C as green
+    sumNoColor <- apply(matColors, 2, function(x) sum(x=="-"))
+    
+    # For each position, check if:
+    # - there's at least one green OR
+    # - there's a mixture of blue and no color
+    # AND ensure it's not all blue
+    # positionCheck <- mapply(function(b, g, nc) {
+    #  (g >= 1) || (b >= 1 && nc >= 1)
+    # }, sumBlue, sumGreen, sumNoColor)
+    
+    # Return true only if all positions pass and at least one position has green
+    # return(all(positionCheck) && any(sumGreen >= 1))
+    
+    # print(paste0('index: ', index))  # //--- comment me out
+    # print(paste0('sumGreen: ', sumGreen))  # //--- comment me out
+    # print(paste0('all(sumGreen >= 1): ', all(sumGreen >= 1)))  # //--- comment me out
+    
+    # print('areIndexesCompatible:')
+    # test_GC_counts(index$color)
+    # stop("Halting script.")
+    
+    # Check if each position has at least one green
+    return(all(sumGreen >= 1))
+  }
+  
   if (chemistry == "X"){
     # Count colors for each position
     sumBlue <- apply(matColors, 2, function(x) sum(x=="B" | x=="C"))  # Count both B and C as blue
@@ -295,7 +329,7 @@ areIndexesCompatible <- function(index, chemistry, column="color"){
     # Check if each position has at least one green
     return(all(sumGreen >= 1))
   }
-
+  
   if (chemistry %in% c("1","2")){
     sumNoColor <- apply(matColors, 2, function(x) sum(x=="-"))
     return(all(sumNoColor < nrow(index)))
@@ -1083,7 +1117,7 @@ calculateSolutionScore <- function(solution, chemistry, percentage_threshold, di
   
   solution_color_percentages_list <- calculate_color_percentages_with_weights(solution)
 
-  if (chemistry == "X") {
+  if (chemistry == "X" || chemistry == "M") {
     percentages_vector <- solution_color_percentages_list$vector_gb
   } else {
     percentages_vector <- solution_color_percentages_list$vector_rg
@@ -1698,7 +1732,7 @@ calculate_color_percentages <- function(solution) {
         }
       }
       
-      # Adjust based on presence of 'C' and 'O'
+      # Adjust based on presence of 'C' and 'O' 
       if ("C" %in% colnames(position_percentages)) {
         position_percentages <- position_percentages %>%
           mutate(
@@ -1818,7 +1852,7 @@ calculate_color_percentages_with_weights <- function(solution) {
           }
         }
         
-        # Adjust based on presence of 'C' and 'O'
+        # Adjust based on presence of 'C' and 'O' 
         if ("C" %in% colnames(position_percentages)) {
           position_percentages <- position_percentages %>%
             mutate(
